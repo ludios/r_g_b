@@ -63,7 +63,7 @@
 	<!-- Hidden 2D canvas holding the seed dots (the shader's videoTexture); three.js adds its own canvas. -->
 	<canvas id="canvas" style="display: none;"></canvas>
 
-	<script id="fragShader" type="shader-code">
+	<script id="fragShader" type="x-shader/x-fragment">
 		// One simulation step. Needs WebGL2 (uint, floatBitsToUint, textureSize); three.js's
 		// WebGL2 prefix #defines texture2D and gl_FragColor.
 		uniform vec2 res;                // The width and height of our screen
