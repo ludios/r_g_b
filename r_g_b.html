@@ -128,7 +128,9 @@
 
 		const renderer = new THREE.WebGLRenderer();
 		renderer.autoClear = false; // Every draw covers the whole target
-		renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // Plain 0-1 values, as in old three.js
+		// Colors are plain 0-1 values, with no sRGB conversions, as in old three.js.
+		THREE.ColorManagement.enabled = false;
+		renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 		document.body.appendChild(renderer.domElement);
 
 		// Each frame draws a full-screen quad into a buffer (one simulation step), then another to
