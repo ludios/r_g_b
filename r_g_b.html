@@ -122,7 +122,6 @@
 		let mouseY = 0.5;
 
 		const renderer = new THREE.WebGLRenderer();
-		renderer.setClearColor(new THREE.Color(GRAY, GRAY, GRAY));
 		document.body.appendChild(renderer.domElement);
 
 		// Each frame draws a full-screen quad into a buffer (one simulation step), then another to
@@ -176,7 +175,8 @@
 			current = new THREE.WebGLRenderTarget(width, height, options);
 			next = new THREE.WebGLRenderTarget(width, height, options);
 			renderer.setRenderTarget(current);
-			renderer.clear(); // To GRAY
+			renderer.setClearColor(new THREE.Color(GRAY, GRAY, GRAY));
+			renderer.clear();
 
 			simMaterial.uniforms.res.value.set(width, height);
 			simMaterial.uniforms.seeds.value = seedTexture;
@@ -304,8 +304,10 @@
 		setup();
 		resetKernel();
 
-		// Restarts the simulation from just the seeds.
+		// Restarts the simulation from just the seeds. A lost WebGL context loses the buffers (and
+		// three.js's clear color), so it restarts too.
 		window.addEventListener("resize", setup);
+		renderer.domElement.addEventListener("webglcontextrestored", setup);
 
 		let dragging = false;
 
