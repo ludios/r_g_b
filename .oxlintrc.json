@@ -1,0 +1,55 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+
+	"options": {
+		"typeAware": true,
+		"typeCheck": true
+	},
+
+	"env": {
+		"browser": true,
+		"es2022": true
+	},
+
+	"plugins": [
+		"eslint",
+		"typescript",
+		"unicorn",
+		"oxc",
+		"import",
+		"promise"
+	],
+
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn",
+		"perf": "warn",
+		"pedantic": "off",
+		"restriction": "off",
+		"style": "off",
+		"nursery": "off"
+	},
+
+	"ignorePatterns": [
+		"dist/**",
+		".worktrees/**",
+		".claude/worktrees/**"
+	],
+
+	"rules": {
+		"no-debugger": "error",
+		// https://typescript-eslint.io/rules/consistent-return/
+		// False-positives on exhaustive switches and `never`-returning tails,
+		// which tsc's own TS2366 check understands correctly.
+		"typescript/consistent-return": "off",
+		"typescript/no-unused-vars": [
+			"error",
+			{
+				"argsIgnorePattern": "^_",
+				"varsIgnorePattern": "^_"
+			}
+		],
+		"typescript/no-explicit-any": "warn",
+		"typescript/consistent-type-imports": "error"
+	}
+}

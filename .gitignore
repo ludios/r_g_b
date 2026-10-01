@@ -1,0 +1,12 @@
+node_modules
+
+# Output
+/dist
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Claude Code, git worktrees for other agents
+/.claude
+.worktrees/

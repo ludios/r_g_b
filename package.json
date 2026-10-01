@@ -1,0 +1,32 @@
+{
+	"name": "r_g_b",
+	"private": true,
+	"version": "0.0.1",
+	"description": "a WebGL feedback loop that grows stripes from three dots",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc && vite build",
+		"preview": "vite preview",
+		"check": "tsc",
+		"lint": "oxlint",
+		"lint:fix": "oxlint --fix"
+	},
+	"devEngines": {
+		"packageManager": {
+			"name": "pnpm",
+			"version": "^11.15.0",
+			"onFail": "download"
+		}
+	},
+	"dependencies": {
+		"three": "^0.186.1"
+	},
+	"devDependencies": {
+		"@types/three": "^0.186.0",
+		"oxlint": "^1.86.0",
+		"oxlint-tsgolint": "^7.0.2003",
+		"typescript": "^7.0.2",
+		"vite": "^8.3.1"
+	}
+}
