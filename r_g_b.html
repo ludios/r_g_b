@@ -4,12 +4,12 @@
 	<title>r_g_b.html by v21</title>
 
 	<meta charset="utf-8">
-	<meta name="og:title" content="r_g_b.html">
-	<meta name="og:author" content="v buckenham">
-	<meta name="og:type" content="website">
+	<meta property="og:title" content="r_g_b.html">
+	<meta property="og:author" content="v buckenham">
+	<meta property="og:type" content="website">
 	<meta property="og:description" content="[content note: can produce strobe effects]">
-	<meta name="og:image" content="https://nottheinternet.com/r_g_b_preview.png">
-	<meta name="og:url" content="https://v21.io/r_g_b.html">
+	<meta property="og:image" content="https://nottheinternet.com/r_g_b_preview.png">
+	<meta property="og:url" content="https://v21.io/r_g_b.html">
 	<meta name="twitter:site" content="@v21">
 	<meta name="twitter:creator" content="@v21">
 
@@ -60,495 +60,285 @@
 	Space: pause. Enter (while paused): single step.
 	-->
 
-	<!-- Hidden 2D canvas holding the seed dots (the shader's videoTexture); three.js adds its own canvas. -->
-	<canvas id="canvas" style="display: none;"></canvas>
-
 	<script id="fragShader" type="x-shader/x-fragment">
-		// One simulation step. Needs WebGL2 (uint, floatBitsToUint, textureSize); three.js's
-		// WebGL2 prefix #defines texture2D and gl_FragColor.
-		uniform vec2 res;                // The width and height of our screen
-		uniform sampler2D bufferTexture; // Our input texture (the previous frame)
-		uniform sampler2D videoTexture;  // Not a video: the seed-dot canvas
-		uniform float kernel[25];        // Row-major 5x5 weights, summing to 1
-		uniform float time;              // Unused
-		uniform float grayFactor;        // Unused (see commented-out code below)
-		uniform float sampleOffset;      // Tap spacing in pixels
-		uniform float alpha;             // How much of the previous frame to keep (not an alpha channel)
+		// One simulation step. Needs WebGL2 (uint, floatBitsToUint); three.js's WebGL2 prefix
+		// #defines gl_FragColor.
+		uniform vec2 res;             // Buffer size in pixels
+		uniform sampler2D prevFrame;
+		uniform sampler2D seeds;      // The seed-dot canvas
+		uniform float kernel[25];     // Row-major 5x5 weights, summing to 1
+		uniform float tapSpacing;     // In pixels
+		uniform float persistence;    // How much of the previous frame to keep
 
 		// noise from http://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
-		uint hash( uint x ) {
-			x += ( x << 10u );
-			x ^= ( x >>  6u );
-			x += ( x <<  3u );
-			x ^= ( x >> 11u );
-			x += ( x << 15u );
+		uint hash(uint x) {
+			x += (x << 10u);
+			x ^= (x >> 6u);
+			x += (x << 3u);
+			x ^= (x >> 11u);
+			x += (x << 15u);
 			return x;
 		}
 
-		uint hash( uvec2 v ) {
-			return hash( v.x ^ hash(v.y) );
+		uint hash(uvec2 v) {
+			return hash(v.x ^ hash(v.y));
 		}
-		
-		float random( vec2 v ) {
+
+		float random(vec2 v) {
 			// Hash bits become the mantissa of a float in [1, 2); subtract 1.
 			const uint mantissaMask = 0x007FFFFFu;
-			const uint one          = 0x3F800000u;
-		   
-			uint h = hash( floatBitsToUint( v ) );
-			h &= mantissaMask;
-			h |= one;
-			
-			float  r2 = uintBitsToFloat( h );
-			return r2 - 1.0;
+			const uint one = 0x3F800000u;
+			uint h = hash(floatBitsToUint(v));
+			return uintBitsToFloat((h & mantissaMask) | one) - 1.0;
 		}
 
 		void main() {
-			vec2 st = gl_FragCoord.xy / res;
-			vec2 uv = st;
-
-			vec4 orig = texture2D(bufferTexture, uv);
+			vec2 uv = gl_FragCoord.xy / res;
 
 			// Static per-pixel +/-5% jitter on the tap spacing (uv is the same every frame). It speckles
 			// stripe edges, over a band that widens with the spacing.
-			vec2 onePixel = (vec2(1) / vec2(textureSize(bufferTexture, 0))) * sampleOffset * (random(uv) * 0.1 + 0.95);
+			vec2 tap = (1.0 / res) * tapSpacing * (random(uv) * 0.1 + 0.95);
 			// The buffers use RepeatWrapping, so the screen is a torus: patterns wrap across edges.
-			vec4 colorSum =
-				texture2D(bufferTexture, uv + onePixel * vec2(-2.0, -2.0)) * kernel[0] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-1.0, -2.0)) * kernel[1] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 0.0, -2.0)) * kernel[2] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 1.0, -2.0)) * kernel[3] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 2.0, -2.0)) * kernel[4] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-2.0, -1.0)) * kernel[5] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-1.0, -1.0)) * kernel[6] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 0.0, -1.0)) * kernel[7] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 1.0, -1.0)) * kernel[8] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 2.0, -1.0)) * kernel[9] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-2.0,  0.0)) * kernel[10] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-1.0,  0.0)) * kernel[11] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 0.0,  0.0)) * kernel[12] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 1.0,  0.0)) * kernel[13] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 2.0,  0.0)) * kernel[14] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-2.0,  1.0)) * kernel[15] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-1.0,  1.0)) * kernel[16] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 0.0,  1.0)) * kernel[17] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 1.0,  1.0)) * kernel[18] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 2.0,  1.0)) * kernel[19] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-2.0,  2.0)) * kernel[20] +
-				texture2D(bufferTexture, uv + onePixel * vec2(-1.0,  2.0)) * kernel[21] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 0.0,  2.0)) * kernel[22] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 1.0,  2.0)) * kernel[23] +
-				texture2D(bufferTexture, uv + onePixel * vec2( 2.0,  2.0)) * kernel[24] ;
+			vec4 sum = vec4(0.0);
+			for (int y = -2; y <= 2; y++) {
+				for (int x = -2; x <= 2; x++) {
+					sum += texture(prevFrame, uv + tap * vec2(x, y)) * kernel[(y + 2) * 5 + (x + 2)];
+				}
+			}
 
-			vec4 outp;
-			vec4 overlay = texture2D(videoTexture, uv);
-			// Same as blending the kernel toward identity: slows growth; alpha = 1 freezes the image.
-			colorSum.rgb = mix(colorSum.rgb, orig.rgb, clamp(alpha, 0.0, 1.0));
-			// Only matters on the first step after startup/resize, when the kernel uniform (and the
-			// input) are still all zeros: colorSum.a = 0 makes everything 0.05 gray. Afterwards
-			// colorSum.a = 1 and this is a no-op.
-			colorSum.rgb = mix(vec3(.05,.05,.05), colorSum.rgb, clamp(colorSum.a, 0.0, 1.0));
+			// Same as blending the kernel toward identity: slows growth; persistence = 1 freezes the image.
+			vec3 color = mix(sum.rgb, texture(prevFrame, uv).rgb, clamp(persistence, 0.0, 1.0));
 			// The clamp is what stops amplified frequencies growing forever (the 8-bit buffers would
 			// clamp anyway, and also round to 1/255). Then re-stamp the seed dots.
-			outp.rgb = mix(clamp(colorSum.rgb, 0.0, 1.0), overlay.rgb, overlay.a);
-			outp.a = 1.0;
-			//vec4 outp2 = vec4(
-			//	mix(outp.r, outp.g + outp.b / 2.0, grayFactor),
-			//	mix(outp.g, outp.r + outp.b / 2.0, grayFactor),
-			//	mix(outp.b, outp.r + outp.g / 2.0, grayFactor),
-			//	1.0
-			//);
-
-			gl_FragColor =  outp;
-		 }
+			vec4 seed = texture(seeds, uv);
+			gl_FragColor = vec4(mix(clamp(color, 0.0, 1.0), seed.rgb, seed.a), 1.0);
+		}
 	</script>
 	<script>
-		var scene;
-		var camera;
+		const KERNEL_FADE_MS = 60 * 1000;
+		const GRAY = 0.05; // Fresh buffers' color; see the top comment for why not black
 
-		var renderer;
-		var bufferScene;
-		var textureA;
-		var textureB;
-		var bufferMaterial;
-		var plane;
-		var bufferObject;
-		var finalMaterial;
-		var quad;
-		var video; // Unused
-		var videoTexture; // Unused (the videoTexture uniform gets canvasTexture)
-		var canvasTexture;
-		var ctx;
+		let mouseX = 0.5;
+		let mouseY = 0.5;
 
-		var w, h;
+		const renderer = new THREE.WebGLRenderer();
+		renderer.setClearColor(new THREE.Color(GRAY, GRAY, GRAY));
+		document.body.appendChild(renderer.domElement);
 
-		var oldKernel, newKernel;
-		var timeOfLastKernelGen;
-		const kernelChangeInterval = 60 * 1000;
+		// Each frame draws a full-screen quad into a buffer (one simulation step), then another to
+		// the screen.
+		const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+		const quad = new THREE.PlaneBufferGeometry(2, 2);
 
-		let mouseX = .5;
-		let mouseY = .5;
+		const simMaterial = new THREE.ShaderMaterial({
+			uniforms: {
+				res: { value: new THREE.Vector2() },
+				prevFrame: { value: null },
+				seeds: { value: null },
+				kernel: { value: null },
+				tapSpacing: { value: 0 },
+				persistence: { value: 0 },
+			},
+			fragmentShader: document.getElementById("fragShader").textContent,
+		});
+		const simScene = new THREE.Scene().add(new THREE.Mesh(quad, simMaterial));
 
-		function sceneSetup() {
-			scene = new THREE.Scene();
-			var width = window.innerWidth;
-			var height = window.innerHeight;
-			camera = new THREE.OrthographicCamera(width / - 2, width / 2, height / 2, height / - 2, 1, 1000);
-			camera.position.z = 2;
+		const screenMaterial = new THREE.MeshBasicMaterial();
+		const screenScene = new THREE.Scene().add(new THREE.Mesh(quad, screenMaterial));
 
-			renderer = new THREE.WebGLRenderer();
-			renderer.setSize(window.innerWidth, window.innerHeight);
-			document.body.appendChild(renderer.domElement);
+		let width, height;
+		let seedTexture;
+		let current, next; // Ping-pong buffers; current holds the latest frame
+
+		// (Re)starts the simulation from just the seeds. Sized in CSS pixels, so on HiDPI the
+		// simulation is upscaled (pixelated, per the CSS).
+		function setup() {
+			width = window.innerWidth;
+			height = window.innerHeight;
+			renderer.setSize(width, height);
+
+			const seedCanvas = document.createElement("canvas");
+			seedCanvas.width = width;
+			seedCanvas.height = height;
+			drawSeeds(seedCanvas.getContext("2d"), width, height);
+			seedTexture?.dispose();
+			seedTexture = new THREE.CanvasTexture(seedCanvas);
+			seedTexture.minFilter = THREE.LinearFilter;
+
+			current?.dispose();
+			next?.dispose();
+			const options = {
+				minFilter: THREE.LinearFilter,
+				magFilter: THREE.NearestFilter,
+				wrapS: THREE.RepeatWrapping,
+				wrapT: THREE.RepeatWrapping,
+			};
+			current = new THREE.WebGLRenderTarget(width, height, options);
+			next = new THREE.WebGLRenderTarget(width, height, options);
+			renderer.setRenderTarget(current);
+			renderer.clear(); // To GRAY
+
+			simMaterial.uniforms.res.value.set(width, height);
+			simMaterial.uniforms.seeds.value = seedTexture;
+			screenMaterial.map = current.texture;
 		}
 
-		function canvasTextureSetup() {
-			var canvas = document.getElementById("canvas");
-			ctx = canvas.getContext("2d");
-
-			w = canvas.width = window.innerWidth;
-			h = canvas.height = window.innerHeight;
-
-			if (canvasTexture) {
-				canvasTexture.dispose();
-			}
-			canvasTexture = new THREE.CanvasTexture(canvas);
-
-			canvasTexture.minFilter = THREE.LinearFilter;
-			canvasTexture.magFilter = THREE.LinearFilter;
-			canvasTexture.format = THREE.RGBAFormat;
-			drawStubbornPixels();
-		}
-
-		// Unused.
-		function drawGray() {
-			let output = ctx.createImageData(w, h);
-			let outputData = output.data;
-
-			for (let i = 0; i < outputData.length / 4; i++) {
-				outputData[i * 4] = 127;
-				outputData[i * 4 + 1] = 127;
-				outputData[i * 4 + 2] = 127;
-				outputData[i * 4 + 3] = 255;
-			}
-
-			ctx.putImageData(output, 0, 0);
-		}
-
-		// Seed dots: R, G, B at 1/6, 1/2, 5/6 along the longer axis. "Stubborn" because the
-		// shader re-stamps them every frame.
-		function drawStubbornPixels() {
-			let setGradient = function (x, y, color) {
-				// Solid out to r=2, transparent by r=10. "#f00" + "0" = "#f000", i.e. transparent red.
-				var gradient = ctx.createRadialGradient(x, y, 0, x, y, 10);
-
+		// Seed dots: R, G, B at 1/6, 1/2, 5/6 along the longer axis, solid out to r=2 and fading to
+		// transparent by r=10.
+		function drawSeeds(ctx, w, h) {
+			for (const [color, along] of [["#f00", 1 / 6], ["#0f0", 3 / 6], ["#00f", 5 / 6]]) {
+				const [x, y] = w >= h
+					? [Math.round(along * w), Math.round(h / 2)]
+					: [Math.round(w / 2), Math.round(along * h)];
+				const gradient = ctx.createRadialGradient(x, y, 0, x, y, 10);
 				gradient.addColorStop(0, color);
 				gradient.addColorStop(0.2, color);
-				gradient.addColorStop(1, color + "0");
-
+				gradient.addColorStop(1, color + "0"); // "#f000" is transparent red
 				ctx.fillStyle = gradient;
-			}
-
-			if (w >= h) {
-				let yCoord = Math.round(h / 2);
-
-				let rCoord = Math.round((1 / 6) * w);
-				setGradient(rCoord, yCoord, "#f00");
 				ctx.beginPath();
-				ctx.arc(rCoord, yCoord, 10, 0, 2 * Math.PI);
-				ctx.fill();
-
-				let gCoord = Math.round((3 / 6) * w);
-				setGradient(gCoord, yCoord, "#0f0");
-				ctx.beginPath();
-				ctx.arc(gCoord, yCoord, 10, 0, 2 * Math.PI);
-				ctx.fill();
-
-				let bCoord = Math.round((5 / 6) * w);
-				setGradient(bCoord, yCoord, "#00f");
-				ctx.beginPath();
-				ctx.arc(bCoord, yCoord, 10, 0, 2 * Math.PI);
-				ctx.fill();
-
-			} else {
-				let xCoord = Math.round(w / 2);
-
-				let rCoord = Math.round((1 / 6) * h);
-				setGradient(xCoord, rCoord, "#f00");
-				ctx.beginPath();
-				ctx.arc(xCoord, rCoord, 10, 0, 2 * Math.PI);
-				ctx.fill();
-
-				let gCoord = Math.round((3 / 6) * h);
-				setGradient(xCoord, gCoord, "#0f0");
-				ctx.beginPath();
-				ctx.arc(xCoord, gCoord, 10, 0, 2 * Math.PI);
-				ctx.fill();
-
-				let bCoord = Math.round((5 / 6) * h);
-				setGradient(xCoord, bCoord, "#00f");
-				ctx.beginPath();
-				ctx.arc(xCoord, bCoord, 10, 0, 2 * Math.PI);
+				ctx.arc(x, y, 10, 0, 2 * Math.PI);
 				ctx.fill();
 			}
 		}
 
-		function bufferTextureSetup() {
-			// Create buffer scene
-			bufferScene = new THREE.Scene();
-			// Create 2 buffer textures
-			// Sized in CSS pixels, so on HiDPI the simulation is upscaled (pixelated, per the CSS).
-			textureA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
-			textureB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
-			// Pass textureA to shader
-			bufferMaterial = new THREE.ShaderMaterial({
-				uniforms: {
-					bufferTexture: { type: "t", value: textureA.texture },
-					res: { type: 'v2', value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-					// Keeps the resolution
-					videoTexture: { type: "t", value: canvasTexture },
-					kernel: { value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-					time: { type: "f", value: Math.random() * Math.PI * 2 + Math.PI },
-					grayFactor: { value: 0.00 },
-					sampleOffset: { value: 1 },
-					alpha: { value: mouseY },
-				},
-				fragmentShader: document.getElementById('fragShader').innerHTML
-			});
-			plane = new THREE.PlaneBufferGeometry(window.innerWidth, window.innerHeight);
-			bufferObject = new THREE.Mesh(plane, bufferMaterial);
-			bufferScene.add(bufferObject);
+		function step() {
+			const uniforms = simMaterial.uniforms;
+			uniforms.prevFrame.value = current.texture;
+			uniforms.kernel.value = currentKernel();
+			// Mouse Y, mapped exponentially (0 at top, 1/32 mid-screen, 1 at bottom), sets the tap
+			// spacing (pattern scale, up to 1/3 of the height) and how much of the previous frame is kept.
+			const y = easeInExpo(mouseY);
+			uniforms.tapSpacing.value = y * height / 3;
+			uniforms.persistence.value = y;
 
-			// Draw textureB to screen 
-			finalMaterial = new THREE.MeshBasicMaterial({ map: textureB });
-			quad = new THREE.Mesh(plane, finalMaterial);
-			scene.add(quad);
+			renderer.setRenderTarget(next);
+			renderer.render(simScene, camera);
+			[current, next] = [next, current];
+
+			screenMaterial.map = current.texture;
+			renderer.setRenderTarget(null);
+			renderer.render(screenScene, camera);
 		}
-
-		sceneSetup();
-		canvasTextureSetup();
-		bufferTextureSetup();
-
-		let paused = false;
 
 		function easeInExpo(x) {
 			return x === 0 ? 0 : Math.pow(2, 10 * x - 10);
-		}
-
-		function render() {
-			if (!paused) {
-				requestAnimationFrame(render);
-			}
-
-			// Draw to textureB
-			renderer.setRenderTarget(textureB);
-			renderer.clear();
-			renderer.render(bufferScene, camera);
-
-			// Swap textureA and B (the screen shows B, so it's one step behind)
-			var t = textureA;
-			textureA = textureB;
-			textureB = t;
-			quad.material.map = textureB.texture;
-			bufferMaterial.uniforms.bufferTexture.value = textureA.texture;
-
-			// Update time
-			bufferMaterial.uniforms.time.value += 0.01;
-			bufferMaterial.uniforms.videoTexture.value = canvasTexture;
-			bufferMaterial.uniforms.kernel.value = getCurrentKernel();
-			// Mouse Y, mapped exponentially (0 at top, 1/32 mid-screen, 1 at bottom), sets the tap
-			// spacing (pattern scale, up to 1/3 of the height) and how much of the previous frame is kept.
-			bufferMaterial.uniforms.alpha.value = easeInExpo(mouseY);// * (0.96 + Math.random() * 0.08);
-			bufferMaterial.uniforms.sampleOffset.value = easeInExpo(mouseY) * window.innerHeight * (1 / 3);// * (0.96 + Math.random() * 0.08);
-			bufferMaterial.uniforms.grayFactor.value = 0;
-
-			// Finally, draw to the screen
-			renderer.setRenderTarget(null);
-			renderer.render(scene, camera);
 		}
 
 		function easeInOutSine(x) {
 			return -(Math.cos(Math.PI * x) - 1) / 2;
 		}
 
-		function getCurrentKernel() {
-			let kernel = [...newKernel];
-			// Crossfade by wall-clock time (so it continues while paused). Relies on setInterval swapping
-			// kernels as the fade completes, but a click restarts the fade and not the interval, so the
-			// next swap comes early and jumps.
-			let t = easeInOutSine((Date.now() - timeOfLastKernelGen) / kernelChangeInterval);
-			for (let i = 0; i < kernel.length; i++) {
-				const nK = newKernel[i];
-				const oK = oldKernel[i];
-				kernel[i] = nK * t + oK * (1 - t);
-			}
-			// Mouse X: scale each weight's deviation from a flat 1/25 by 0.8x-3.8x. More deviation
-			// amplifies more frequencies, more strongly. At the far left, smooth kernels may amplify
-			// nothing, and the pattern dissolves.
-			kernel = kernel.map(k => {
-				k -= 1 / 25;
-				k *= mouseX * 3 + .8;
-				k += 1 / 25;
-				return k;
-			});
+		let oldKernel, newKernel, fadeStart;
 
-			// Redundant: the crossfade and scaling above already keep the sum at 1.
-			var sum = kernel.reduce((s, v) => s + v);
-			var adjustment = (1 - sum) / 25;
-			for (var i = 0; i < kernel.length; i++) {
-				kernel[i] = kernel[i] + adjustment;
-			};
-			return kernel;
+		function fadeToNewKernel(from) {
+			oldKernel = from;
+			newKernel = genKernel();
+			fadeStart = Date.now();
 		}
 
-		// Box-Muller normal with mean 0.5 and sd 0.1, rejected outside [0, 1].
-		function randn_bm() {
-			let u = 0, v = 0;
-			while (u === 0) {
-				u = Math.random(); //Converting [0,1) to (0,1)
+		// Click/tap: jump to a random kernel, fading toward another. The image isn't reset.
+		function resetKernel() {
+			fadeToNewKernel(genKernel());
+		}
+
+		function currentKernel() {
+			// Crossfade by wall-clock time, so it continues while paused.
+			if (Date.now() - fadeStart >= KERNEL_FADE_MS) {
+				fadeToNewKernel(newKernel);
 			}
-			while (v === 0) {
-				v = Math.random();
-			}
-			let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-			num = num / 10.0 + 0.5; // Translate to 0 -> 1
-			if (num > 1 || num < 0) {
-				// resample between 0 and 1
-				return randn_bm();
-			}
-			return num
+			const t = easeInOutSine((Date.now() - fadeStart) / KERNEL_FADE_MS);
+			// Mouse X: scale each weight's deviation from a flat 1/25 by 0.8x-3.8x. More deviation
+			// amplifies more frequencies, more strongly. At the far left, smooth kernels may amplify
+			// nothing, and the pattern dissolves. Both the crossfade and this keep the sum at 1.
+			const gain = mouseX * 3 + 0.8;
+			return newKernel.map((k, i) => (k * t + oldKernel[i] * (1 - t) - 1 / 25) * gain + 1 / 25);
 		}
 
 		// Flat 1/25 plus N(0, 0.2) noise per weight (so the noise dominates), smoothed by a random
 		// mix of identity and 3x3 blur, then shifted to sum to 1. Smoother weights mean wider
 		// stripes and slower growth.
-		var genKernel = function () {
-			var range = 1;
-			var rand = [];
-			for (let i = 0; i < 25; i++) {
-				rand.push((1 / 25) + (randn_bm() - .5) * 2 * range);
-			}
-
-			// blur, blur2: unused 5x5 Gaussians.
-			var blur = [1.0278445, 4.10018648, 6.49510362, 4.10018648, 1.0278445,
-				4.10018648, 16.35610171, 25.90969361, 16.35610171, 4.10018648,
-				6.49510362, 25.90969361, 41.0435344, 25.90969361, 6.49510362,
-				4.10018648, 16.35610171, 25.90969361, 16.35610171, 4.10018648,
-				1.0278445, 4.10018648, 6.49510362, 4.10018648, 1.0278445];
-
-			var blur2 = [1.0278445 / 273, 4.10018648 / 273, 6.49510362 / 273, 4.10018648 / 273, 1.0278445 / 273,
-			4.10018648 / 273, 16.35610171 / 273, 25.90969361 / 273, 16.35610171 / 273, 4.10018648 / 273,
-			6.49510362 / 273, 25.90969361 / 273, 41.0435344 / 273, 25.90969361 / 273, 6.49510362 / 273,
-			4.10018648 / 273, 16.35610171 / 273, 25.90969361 / 273, 16.35610171 / 273, 4.10018648 / 273,
-			1.0278445 / 273, 4.10018648 / 273, 6.49510362 / 273, 4.10018648 / 273, 1.0278445 / 273];
-
-			// for (let i=0; i < 25; i++) { 
-			// 	rand[i] = rand[i] - 1.5 + blur[i] / (41 * 1.5);
-			// }
-
-			// rand[13] = Math.abs(rand[13]);
-			let blur9 = [1 / 16, 2 / 16, 1 / 16, 2 / 16, 4 / 16, 2 / 16, 1 / 16, 2 / 16, 1 / 16];
-			let identity = [0, 0, 0, 0, 1, 0, 0, 0, 0];
-			let blurAmount = Math.random();
-			let kernelKernel = [...identity.keys()].map(i => blur9[i] * blurAmount + identity[i] * (1 - blurAmount));
-			let kernel = convolve(rand, kernelKernel);
-			// kernel = convolve(kernel, [1/9,1/9,1/9,1/9,1/9,1/9,1/9,1/9,1/9]);
-
-			var sum = kernel.reduce((s, v) => s + v);
-			var adjustment = (1 - sum) / 25;
-			for (var i = 0; i < kernel.length; i++) {
-				kernel[i] = kernel[i] + adjustment;
-			};
+		function genKernel() {
+			const noise = Array.from({ length: 25 }, () => 1 / 25 + 0.2 * randomNormal());
+			const blurAmount = Math.random();
+			const identity = [0, 0, 0, 0, 1, 0, 0, 0, 0];
+			const blur = [1, 2, 1, 2, 4, 2, 1, 2, 1].map(b => b / 16);
+			const smoothing = blur.map((b, i) => b * blurAmount + identity[i] * (1 - blurAmount));
+			const smoothed = convolve5x5(noise, smoothing);
+			const adjustment = (1 - smoothed.reduce((s, v) => s + v)) / 25;
+			const kernel = smoothed.map(k => k + adjustment);
 			console.log(JSON.stringify(kernel));
 			return kernel;
 		}
 
+		// Box-Muller
+		function randomNormal() {
+			const u = 1 - Math.random(); // (0, 1], so the log is finite
+			const v = Math.random();
+			return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+		}
+
 		// Filters the 5x5 weight grid itself with a 3x3 kernel, zero-padded.
-		function convolve(input, kernel) {
-			let index = (x, y, w) => y * w + x;
-			let lookup = (x, y, w, h, arr) => {
-				if (x < 0 || x >= w || y < 0 || y >= h) {
-					return 0;
+		function convolve5x5(grid, kernel3x3) {
+			const at = (x, y) => (x < 0 || x >= 5 || y < 0 || y >= 5 ? 0 : grid[y * 5 + x]);
+			return grid.map((_, i) => {
+				const x = i % 5;
+				const y = Math.floor(i / 5);
+				let sum = 0;
+				for (let dy = -1; dy <= 1; dy++) {
+					for (let dx = -1; dx <= 1; dx++) {
+						sum += at(x + dx, y + dy) * kernel3x3[(dy + 1) * 3 + (dx + 1)];
+					}
 				}
-				return arr[index(x, y, w)];
-			}
-			let output = [...input];
-			for (let i = 0; i < 5; i++) {
-				for (let j = 0; j < 5; j++) {
-					output[index(i, j, 5)] =
-						lookup(i - 1, j - 1, 5, 5, input) * kernel[0] +
-						lookup(i, j - 1, 5, 5, input) * kernel[1] +
-						lookup(i + 1, j - 1, 5, 5, input) * kernel[2] +
-						lookup(i - 1, j, 5, 5, input) * kernel[3] +
-						lookup(i, j, 5, 5, input) * kernel[4] +
-						lookup(i + 1, j, 5, 5, input) * kernel[5] +
-						lookup(i - 1, j + 1, 5, 5, input) * kernel[6] +
-						lookup(i, j + 1, 5, 5, input) * kernel[7] +
-						lookup(i + 1, j + 1, 5, 5, input) * kernel[8];
-				}
-			}
-			return output;
+				return sum;
+			});
 		}
 
-		function addNewKernel() {
-			oldKernel = [...newKernel];
-			newKernel = genKernel();
-			timeOfLastKernelGen = Date.now();
-		}
-		setInterval(addNewKernel, kernelChangeInterval);
+		let paused = false;
+		let frameRequest;
 
-		// Click/tap: jump to a random kernel, fading toward another. The image isn't reset.
-		function resetKernel() {
-			oldKernel = genKernel();
-			newKernel = genKernel();
-			timeOfLastKernelGen = Date.now();
-
+		function loop() {
+			step();
+			frameRequest = requestAnimationFrame(loop);
 		}
+
+		setup();
 		resetKernel();
 
-		// New buffers, so the simulation restarts from just the seeds. Old quads are never removed
-		// from `scene`.
-		function onWindowResize() {
-			renderer.setSize(window.innerWidth, window.innerHeight);
-
-			canvasTexture.dispose();
-
-			textureA.dispose();
-			textureB.dispose();
-			bufferMaterial.dispose();
-			plane.dispose();
-			finalMaterial.dispose();
-
-			canvasTextureSetup();
-			bufferTextureSetup();
-
-			camera = new THREE.OrthographicCamera(w / - 2, w / 2, h / 2, h / - 2, 1, 1000);
-			camera.position.z = 2;
-		}
-
-		window.addEventListener('resize', onWindowResize);
+		// Restarts the simulation from just the seeds.
+		window.addEventListener("resize", setup);
 
 		let dragging = false;
 
-		window.addEventListener('click', resetKernel);
+		window.addEventListener("mousemove", ev => {
+			mouseX = ev.pageX / width;
+			mouseY = ev.pageY / height;
+		});
+		window.addEventListener("touchmove", ev => {
+			mouseX = ev.touches[0].pageX / width;
+			mouseY = ev.touches[0].pageY / height;
+			dragging = true;
+		});
+		window.addEventListener("touchstart", () => { dragging = false; });
+		window.addEventListener("click", resetKernel);
 		// preventDefault stops the emulated click from resetting again.
-		window.addEventListener("touchend", (ev) => { if (!dragging) resetKernel(); ev.preventDefault(); });
-		window.addEventListener("mousemove", (ev) => { mouseX = ev.pageX / window.innerWidth; mouseY = ev.pageY / window.innerHeight; }, false);
-		window.addEventListener("touchmove", (ev) => { mouseX = ev.touches[0].pageX / window.innerWidth; mouseY = ev.touches[0].pageY / window.innerHeight; dragging = true; }, false);
-		window.addEventListener("touchstart", (ev) => { dragging = false; }, false);
-		// Enter steps once while paused. While running, each Enter starts another rAF loop (faster
-		// simulation) until Space pauses.
-		window.addEventListener('keydown', event => {
-			if (event.code === 'Space') {
+		window.addEventListener("touchend", ev => {
+			if (!dragging) resetKernel();
+			ev.preventDefault();
+		});
+		window.addEventListener("keydown", event => {
+			if (event.code === "Space") {
 				paused = !paused;
-				if (!paused) {
-					render();
+				if (paused) {
+					cancelAnimationFrame(frameRequest);
+				} else {
+					loop();
 				}
+			} else if (event.code === "Enter" && paused) {
+				step();
 			}
-			if (event.code === 'Enter') {
-				render();
-			}
-		})
+		});
 
-		render();
+		loop();
 	</script>
 </body>
 
