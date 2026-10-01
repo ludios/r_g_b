@@ -1,47 +1,42 @@
 <html>
-
 <head>
 	<title>r_g_b.html by v21</title>
 
-	<head>
-		<meta charset="utf-8">
-		<meta name="og:title" content="r_g_b.html">
-		<meta name="og:author" content="v buckenham">
-		<meta name="og:type" content="website">
-		<meta property="og:description" content="[content note: can produce strobe effects]">
-		<meta name="og:image" content="https://nottheinternet.com/r_g_b_preview.png">
-		<meta name="og:url" content="https://v21.io/r_g_b.html">
-		<meta name="twitter:site" content="@v21">
-		<meta name="twitter:creator" content="@v21">
+	<meta charset="utf-8">
+	<meta name="og:title" content="r_g_b.html">
+	<meta name="og:author" content="v buckenham">
+	<meta name="og:type" content="website">
+	<meta property="og:description" content="[content note: can produce strobe effects]">
+	<meta name="og:image" content="https://nottheinternet.com/r_g_b_preview.png">
+	<meta name="og:url" content="https://v21.io/r_g_b.html">
+	<meta name="twitter:site" content="@v21">
+	<meta name="twitter:creator" content="@v21">
 
-		<script src="three.js"></script>
+	<script src="three.js"></script>
 
-		<style>
-			* {
-				margin: 0;
-				padding: 0;
-			}
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
 
-			/* to remove the top and left whitespace */
+		/* To remove the top and left whitespace */
+		html,
+		body {
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+		}
 
-			html,
-			body {
-				width: 100%;
-				height: 100%;
-				overflow: hidden;
-			}
-
-			/* just to be sure these are full screen*/
-
-			canvas {
-				width: 100%;
-				height: 100%;
-				display: block;
-				image-rendering: pixelated;
-			}
-		</style>
-	</head>
-
+		/* Just to be sure these are full screen */
+		canvas {
+			width: 100%;
+			height: 100%;
+			display: block;
+			image-rendering: pixelated;
+		}
+	</style>
+</head>
 <body>
 
 	<!-- based on https://github.com/samhains/minimal-threejs-feedback-glsl/blob/master/index.html
