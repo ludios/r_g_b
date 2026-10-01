@@ -202,6 +202,11 @@
 		}
 
 		function step() {
+			// The fade runs on real time, so it advances while paused; the next one starts at the first
+			// step after it ends.
+			if (performance.now() - fadeStart >= KERNEL_FADE_MS) {
+				fadeToNewKernel(newKernel);
+			}
 			const uniforms = simMaterial.uniforms;
 			uniforms.prevFrame.value = current.texture;
 			uniforms.kernel.value = currentKernel();
@@ -233,7 +238,7 @@
 		function fadeToNewKernel(from) {
 			oldKernel = from;
 			newKernel = genKernel();
-			fadeStart = Date.now();
+			fadeStart = performance.now();
 		}
 
 		// Click/tap: jump to a random kernel, fading toward another. The image isn't reset.
@@ -242,11 +247,7 @@
 		}
 
 		function currentKernel() {
-			// Crossfade by wall-clock time, so it continues while paused.
-			if (Date.now() - fadeStart >= KERNEL_FADE_MS) {
-				fadeToNewKernel(newKernel);
-			}
-			const t = easeInOutSine((Date.now() - fadeStart) / KERNEL_FADE_MS);
+			const t = easeInOutSine((performance.now() - fadeStart) / KERNEL_FADE_MS);
 			// Mouse X: scale each weight's deviation from a flat 1/25 by 0.8x-3.8x. More deviation
 			// amplifies more frequencies, more strongly. At the far left, smooth kernels may amplify
 			// nothing, and the pattern dissolves. Both the crossfade and this keep the sum at 1.
@@ -297,8 +298,8 @@
 		let frameRequest;
 
 		function loop() {
+			frameRequest = requestAnimationFrame(loop); // First, so an exception in step() doesn't stop the loop
 			step();
-			frameRequest = requestAnimationFrame(loop);
 		}
 
 		setup();
