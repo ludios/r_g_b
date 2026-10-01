@@ -37,7 +37,8 @@
 		}
 	</style>
 
-	<!-- Vite compiles this: `pnpm dev`, or `pnpm build` into dist/ -->
+	<!-- Vite compiles this. `pnpm dev` serves the page at /r_g_b.html; `pnpm build` writes dist/ to
+	deploy, which needs http too: browsers won't load modules into a file:// page. -->
 	<script type="module" src="./r_g_b.ts"></script>
 </head>
 <body>
