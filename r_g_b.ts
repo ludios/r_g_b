@@ -84,7 +84,10 @@ function setup() {
 	seedTexture = new THREE.CanvasTexture(seedCanvas);
 	seedTexture.minFilter = THREE.LinearFilter;
 
-	current.setSize(width, height); // Reallocates if the size changed
+	// Freed here (along with anything left from a lost context); reallocated on first use.
+	current.dispose();
+	next.dispose();
+	current.setSize(width, height);
 	next.setSize(width, height);
 	renderer.setRenderTarget(current);
 	renderer.setClearColor(new THREE.Color(GRAY, GRAY, GRAY));
