@@ -247,9 +247,7 @@
 		// Seed dots: R, G, B at 1/6, 1/2, 5/6 along the longer axis. "Stubborn" because the
 		// shader re-stamps them every frame.
 		function drawStubbornPixels() {
-
 			let setGradient = function (x, y, color) {
-
 				// Solid out to r=2, transparent by r=10. "#f00" + "0" = "#f000", i.e. transparent red.
 				var gradient = ctx.createRadialGradient(x, y, 0, x, y, 10);
 
@@ -261,7 +259,6 @@
 			}
 
 			if (w >= h) {
-
 				let yCoord = Math.round(h / 2);
 
 				let rCoord = Math.round((1 / 6) * w);
@@ -270,13 +267,11 @@
 				ctx.arc(rCoord, yCoord, 10, 0, 2 * Math.PI);
 				ctx.fill();
 
-
 				let gCoord = Math.round((3 / 6) * w);
 				setGradient(gCoord, yCoord, "#0f0");
 				ctx.beginPath();
 				ctx.arc(gCoord, yCoord, 10, 0, 2 * Math.PI);
 				ctx.fill();
-
 
 				let bCoord = Math.round((5 / 6) * w);
 				setGradient(bCoord, yCoord, "#00f");
@@ -294,20 +289,17 @@
 				ctx.arc(xCoord, rCoord, 10, 0, 2 * Math.PI);
 				ctx.fill();
 
-
 				let gCoord = Math.round((3 / 6) * h);
 				setGradient(xCoord, gCoord, "#0f0");
 				ctx.beginPath();
 				ctx.arc(xCoord, gCoord, 10, 0, 2 * Math.PI);
 				ctx.fill();
 
-
 				let bCoord = Math.round((5 / 6) * h);
 				setGradient(xCoord, bCoord, "#00f");
 				ctx.beginPath();
 				ctx.arc(xCoord, bCoord, 10, 0, 2 * Math.PI);
 				ctx.fill();
-
 			}
 		}
 
@@ -343,12 +335,8 @@
 		}
 
 		sceneSetup();
-
 		canvasTextureSetup();
-
 		bufferTextureSetup();
-
-
 
 		let paused = false;
 
@@ -357,24 +345,23 @@
 		}
 
 		function render() {
+			if (!paused) {
+				requestAnimationFrame(render);
+			}
 
-
-
-			if (!paused) requestAnimationFrame(render);
-
-			//Draw to textureB
+			// Draw to textureB
 			renderer.setRenderTarget(textureB);
 			renderer.clear();
 			renderer.render(bufferScene, camera);
 
-			//Swap textureA and B (the screen shows B, so it's one step behind)
+			// Swap textureA and B (the screen shows B, so it's one step behind)
 			var t = textureA;
 			textureA = textureB;
 			textureB = t;
 			quad.material.map = textureB.texture;
 			bufferMaterial.uniforms.bufferTexture.value = textureA.texture;
 
-			//Update time
+			// Update time
 			bufferMaterial.uniforms.time.value += 0.01;
 			bufferMaterial.uniforms.videoTexture.value = canvasTexture;
 			bufferMaterial.uniforms.kernel.value = getCurrentKernel();
@@ -508,15 +495,12 @@
 			return output;
 		}
 
-
-
 		function addNewKernel() {
 			oldKernel = [...newKernel];
 			newKernel = genKernel();
 			timeOfLastKernelGen = Date.now();
 		}
 		setInterval(addNewKernel, kernelChangeInterval);
-
 
 		// Click/tap: jump to a random kernel, fading toward another. The image isn't reset.
 		function resetKernel() {
@@ -544,25 +528,17 @@
 			canvasTextureSetup();
 			bufferTextureSetup();
 
-
-
 			camera = new THREE.OrthographicCamera(w / - 2, w / 2, h / 2, h / - 2, 1, 1000);
 			camera.position.z = 2;
-
-
 		}
 
-
 		window.addEventListener('resize', onWindowResize);
-
 
 		let dragging = false;
 
 		window.addEventListener('click', resetKernel);
 		// preventDefault stops the emulated click from resetting again.
 		window.addEventListener("touchend", (ev) => { if (!dragging) resetKernel(); ev.preventDefault(); });
-
-
 		window.addEventListener("mousemove", (ev) => { mouseX = ev.pageX / window.innerWidth; mouseY = ev.pageY / window.innerHeight; }, false);
 		window.addEventListener("touchmove", (ev) => { mouseX = ev.touches[0].pageX / window.innerWidth; mouseY = ev.touches[0].pageY / window.innerHeight; dragging = true; }, false);
 		window.addEventListener("touchstart", (ev) => { dragging = false; }, false);
@@ -580,10 +556,7 @@
 			}
 		})
 
-
 		render();
-
-
 	</script>
 </body>
 
