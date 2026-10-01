@@ -406,11 +406,18 @@
 		// Box-Muller normal with mean 0.5 and sd 0.1, rejected outside [0, 1].
 		function randn_bm() {
 			let u = 0, v = 0;
-			while (u === 0) u = Math.random(); //Converting [0,1) to (0,1)
-			while (v === 0) v = Math.random();
+			while (u === 0) {
+				u = Math.random(); //Converting [0,1) to (0,1)
+			}
+			while (v === 0) {
+				v = Math.random();
+			}
 			let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 			num = num / 10.0 + 0.5; // Translate to 0 -> 1
-			if (num > 1 || num < 0) return randn_bm() // resample between 0 and 1
+			if (num > 1 || num < 0) {
+				// resample between 0 and 1
+				return randn_bm();
+			}
 			return num
 		}
 
@@ -449,7 +456,6 @@
 			let kernel = convolve(rand, kernelKernel);
 			// kernel = convolve(kernel, [1/9,1/9,1/9,1/9,1/9,1/9,1/9,1/9,1/9]);
 
-
 			var sum = kernel.reduce((s, v) => s + v);
 			var adjustment = (1 - sum) / 25;
 			for (var i = 0; i < kernel.length; i++) {
@@ -463,8 +469,10 @@
 		function convolve(input, kernel) {
 			let index = (x, y, w) => y * w + x;
 			let lookup = (x, y, w, h, arr) => {
-				if (x < 0 || x >= w || y < 0 || y >= h) return 0;
-				else return arr[index(x, y, w)];
+				if (x < 0 || x >= w || y < 0 || y >= h) {
+					return 0;
+				}
+				return arr[index(x, y, w)];
 			}
 			let output = [...input];
 			for (let i = 0; i < 5; i++) {
@@ -503,7 +511,6 @@
 		// New buffers, so the simulation restarts from just the seeds. Old quads are never removed
 		// from `scene`.
 		function onWindowResize() {
-
 			renderer.setSize(window.innerWidth, window.innerHeight);
 
 			canvasTexture.dispose();
