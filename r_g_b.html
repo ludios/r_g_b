@@ -106,7 +106,7 @@
 			vec2 st = gl_FragCoord.xy / res;
 			vec2 uv = st;
 
-			vec4  orig = texture2D(bufferTexture, uv) ;
+			vec4 orig = texture2D(bufferTexture, uv);
 
 			// Static per-pixel +/-5% jitter on the tap spacing (uv is the same every frame). It speckles
 			// stripe edges, over a band that widens with the spacing.
@@ -371,7 +371,6 @@
 		function easeInOutSine(x) {
 			return -(Math.cos(Math.PI * x) - 1) / 2;
 		}
-
 
 		function getCurrentKernel() {
 			let kernel = [...newKernel];
