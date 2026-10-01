@@ -61,10 +61,7 @@
 	-->
 
 	<!-- Hidden 2D canvas holding the seed dots (the shader's videoTexture); three.js adds its own canvas. -->
-	<canvas id="canvas" style="display: none;">
-
-
-	</canvas>
+	<canvas id="canvas" style="display: none;"></canvas>
 
 	<script id="fragShader" type="shader-code">
 		// One simulation step. Needs WebGL2 (uint, floatBitsToUint, textureSize); three.js's
@@ -142,8 +139,6 @@
 				texture2D(bufferTexture, uv + onePixel * vec2( 1.0,  2.0)) * kernel[23] +
 				texture2D(bufferTexture, uv + onePixel * vec2( 2.0,  2.0)) * kernel[24] ;
 
-
-			
 			vec4 outp;
 			vec4 overlay = texture2D(videoTexture, uv);
 			// Same as blending the kernel toward identity: slows growth; alpha = 1 freezes the image.
@@ -163,7 +158,6 @@
 			//);
 
 			gl_FragColor =  outp;
-		 	
 		 }
 	</script>
 	<script>
@@ -207,7 +201,6 @@
 		}
 
 		function canvasTextureSetup() {
-
 			var canvas = document.getElementById("canvas");
 			ctx = canvas.getContext("2d");
 
@@ -225,11 +218,8 @@
 			drawStubbornPixels();
 		}
 
-
 		// Unused.
 		function drawGray() {
-
-
 			let output = ctx.createImageData(w, h);
 			let outputData = output.data;
 
@@ -242,7 +232,6 @@
 
 			ctx.putImageData(output, 0, 0);
 		}
-
 
 		// Seed dots: R, G, B at 1/6, 1/2, 5/6 along the longer axis. "Stubborn" because the
 		// shader re-stamps them every frame.
@@ -279,8 +268,7 @@
 				ctx.arc(bCoord, yCoord, 10, 0, 2 * Math.PI);
 				ctx.fill();
 
-			}
-			else {
+			} else {
 				let xCoord = Math.round(w / 2);
 
 				let rCoord = Math.round((1 / 6) * h);
