@@ -122,6 +122,7 @@
 		let mouseY = 0.5;
 
 		const renderer = new THREE.WebGLRenderer();
+		renderer.autoClear = false; // Every draw covers the whole target
 		document.body.appendChild(renderer.domElement);
 
 		// Each frame draws a full-screen quad into a buffer (one simulation step), then another to
@@ -171,6 +172,8 @@
 				magFilter: THREE.NearestFilter,
 				wrapS: THREE.RepeatWrapping,
 				wrapT: THREE.RepeatWrapping,
+				depthBuffer: false,
+				stencilBuffer: false,
 			};
 			current = new THREE.WebGLRenderTarget(width, height, options);
 			next = new THREE.WebGLRenderTarget(width, height, options);
@@ -180,7 +183,6 @@
 
 			simMaterial.uniforms.res.value.set(width, height);
 			simMaterial.uniforms.seeds.value = seedTexture;
-			screenMaterial.map = current.texture;
 		}
 
 		// Seed dots: R, G, B at 1/6, 1/2, 5/6 along the longer axis, solid out to r=2 and fading to
