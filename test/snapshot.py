@@ -5,15 +5,17 @@
     test/snapshot.py --diff DIR1 DIR2
 
 PAGE is a file, or REV:FILE from git (e.g. HEAD:r_g_b.html), loaded along with the rest of the tree
-at REV. If PAGE's directory has a vite.config.ts, the page is built first, unminified, with the
-working tree's node_modules. For each of a few mouse positions, headless Chrome (SwiftShader WebGL2)
-loads the page; once the DOM is loaded, it renders N more frames by calling the captured
+at REV. If PAGE's directory has a vite.config.ts, the page is built first, unminified, with that
+directory's node_modules (for REV, the working tree's, so both sides of a dependency bump would
+build with the same versions). For each of a few mouse positions, headless Chrome (SwiftShader
+WebGL2) loads the page; once the DOM is loaded, it renders N more frames by calling the captured
 requestAnimationFrame callback, and saves the screen to OUTDIR/mouse-X-Y.png.
 
 Math.random is seeded, with separate streams for three.js's generateUUID and for everything else,
-so kernels don't depend on how many objects three.js creates. The mouse is placed by calling the
-mousemove listener as soon as it's added. Date.now() and performance.now() start frozen and advance
-500 ms per frame, so 150 frames cross the 60 s kernel swap.
+so kernels don't depend on how many objects three.js creates; a page whose generateUUID can't be
+found is an error. The mouse is placed by calling the mousemove listener as soon as it's added.
+Date.now() and performance.now() start frozen and advance 500 ms per frame, so 150 frames cross the
+60 s kernel swap.
 
 Example: test/snapshot.py HEAD:r_g_b.html /tmp/a && test/snapshot.py r_g_b.html /tmp/b &&
 test/snapshot.py --diff /tmp/a /tmp/b
@@ -32,7 +34,8 @@ PRE = """<script>
     };
     const pageRandom = mulberry32(%(seed)d), libraryRandom = mulberry32(~%(seed)d);
     // Stack line 2 is Math.random's caller.
-    Math.random = () => new Error().stack.split("\\n")[2].includes(" at generateUUID") ? libraryRandom() : pageRandom();
+    window.__libraryCalls = 0;
+    Math.random = () => new Error().stack.split("\\n")[2].includes(" at generateUUID") ? (__libraryCalls++, libraryRandom()) : pageRandom();
     window.__elapsed = 0;
     Date.now = () => 1e12 + __elapsed;
     performance.now = () => 1000 + __elapsed;
@@ -67,6 +70,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const cb = __frame;
             __frame = null;
             cb(performance.now());
+        }
+        if (!__libraryCalls) {
+            __errors.push("harness: no Math.random calls from generateUUID; is three.js minified?");
         }
         const gl = [...document.querySelectorAll("canvas")].map(c => c.getContext("webgl2")).find(Boolean);
         const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
@@ -110,10 +116,10 @@ def read_png(path):
 
 def load_page(page, tmp):
     """Returns (html, directory that relative URLs resolve against)."""
-    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                         check=True).stdout.strip()
     rev, sep, path = page.partition(":")
     if sep and not os.path.exists(page):
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                             check=True).stdout.strip()
         tree = os.path.join(tmp, "tree")
         os.mkdir(tree)
         archive = subprocess.run(["git", "-C", top, "archive", rev], capture_output=True, check=True).stdout
@@ -124,7 +130,7 @@ def load_page(page, tmp):
     if os.path.exists(os.path.join(root, "vite.config.ts")):
         # Unminified, so that PRE can find generateUUID in stacks.
         dist = os.path.join(tmp, "dist")
-        subprocess.run([os.path.join(top, "node_modules/.bin/vite"), "build", "--logLevel", "error",
+        subprocess.run([os.path.join(root, "node_modules/.bin/vite"), "build", "--logLevel", "error",
                         "--minify", "false", "--outDir", dist, "--emptyOutDir"], cwd=root, check=True)
         page = os.path.join(dist, os.path.basename(page))
     return open(page).read(), os.path.dirname(os.path.abspath(page))
