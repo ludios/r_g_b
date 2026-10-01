@@ -55,12 +55,12 @@ export class Simulation {
 		tap_spacing: { value: 0 },
 		persistence: { value: 0 },
 	};
-	#sim_scene: THREE.Scene;
 	#screen_material = new THREE.MeshBasicMaterial();
 	#screen_scene: THREE.Scene;
+	#sim_scene:    THREE.Scene;
 	// Ping-pong buffers; current holds the latest frame. restart() sizes them.
-	#current: THREE.WebGLRenderTarget;
-	#next: THREE.WebGLRenderTarget;
+	#current:      THREE.WebGLRenderTarget;
+	#next:         THREE.WebGLRenderTarget;
 	#seed_texture: THREE.CanvasTexture | undefined;
 
 	constructor(canvas: HTMLCanvasElement) {
@@ -72,7 +72,7 @@ export class Simulation {
 
 		const quad = new THREE.PlaneGeometry(2, 2);
 		const sim_material = new THREE.ShaderMaterial({ uniforms: this.#sim_uniforms, fragmentShader: sim_shader });
-		this.#sim_scene = new THREE.Scene().add(new THREE.Mesh(quad, sim_material));
+		this.#sim_scene    = new THREE.Scene().add(new THREE.Mesh(quad, sim_material));
 		this.#screen_scene = new THREE.Scene().add(new THREE.Mesh(quad, this.#screen_material));
 
 		const target_options = {
