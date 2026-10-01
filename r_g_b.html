@@ -45,7 +45,7 @@
 	Feedback loop: each frame convolves the previous one with a random 5x5 kernel and clamps to [0, 1].
 	The kernel sums to 1, so flat areas stay flat, but it amplifies some spatial frequencies; those grow
 	every frame until the clamp saturates them, leaving stripes a few tap spacings apart. Lopsided
-	kernels make them drift.
+	kernels make them drift; negative gain makes them invert every frame (the strobing).
 
 	R, G and B are three independent simulations sharing the kernel. Each saturates to 0 or 1, hence
 	mostly black, white, R, G, B, C, M and Y.
@@ -57,7 +57,7 @@
 
 	Mouse X: kernel contrast. Mouse Y: tap spacing; near the bottom it also keeps more of the previous
 	frame, freezing at the very bottom. Click/tap: new kernel (one is also crossfaded in every minute).
-	Space: pause. Enter: single step.
+	Space: pause. Enter (while paused): single step.
 	-->
 
 	<!-- Hidden 2D canvas holding the seed dots (the shader's videoTexture); three.js adds its own canvas. -->
@@ -143,11 +143,12 @@
 			vec4 overlay = texture2D(videoTexture, uv);
 			// Same as blending the kernel toward identity: slows growth; alpha = 1 freezes the image.
 			colorSum.rgb = mix(colorSum.rgb, orig.rgb, clamp(alpha, 0.0, 1.0));
-			// Only matters for fresh render targets (startup, resize): they're all zeros, so alpha 0
-			// turns them 0.05 gray. Afterwards alpha is 1 everywhere and this is a no-op.
+			// Only matters on the first step after startup/resize, when the kernel uniform (and the
+			// input) are still all zeros: colorSum.a = 0 makes everything 0.05 gray. Afterwards
+			// colorSum.a = 1 and this is a no-op.
 			colorSum.rgb = mix(vec3(.05,.05,.05), colorSum.rgb, clamp(colorSum.a, 0.0, 1.0));
-			// The clamp is the only nonlinearity, and all that stops amplified frequencies growing
-			// forever. Then re-stamp the seed dots.
+			// The clamp is what stops amplified frequencies growing forever (the 8-bit buffers would
+			// clamp anyway, and also round to 1/255). Then re-stamp the seed dots.
 			outp.rgb = mix(clamp(colorSum.rgb, 0.0, 1.0), overlay.rgb, overlay.a);
 			outp.a = 1.0;
 			//vec4 outp2 = vec4(
@@ -173,8 +174,8 @@
 		var bufferObject;
 		var finalMaterial;
 		var quad;
-		var video;
-		var videoTexture;
+		var video; // Unused
+		var videoTexture; // Unused (the videoTexture uniform gets canvasTexture)
 		var canvasTexture;
 		var ctx;
 
@@ -194,7 +195,6 @@
 			camera = new THREE.OrthographicCamera(width / - 2, width / 2, height / 2, height / - 2, 1, 1000);
 			camera.position.z = 2;
 
-			// No setPixelRatio: simulates at CSS-pixel resolution (upscaled, pixelated, on HiDPI).
 			renderer = new THREE.WebGLRenderer();
 			renderer.setSize(window.innerWidth, window.innerHeight);
 			document.body.appendChild(renderer.domElement);
@@ -295,6 +295,7 @@
 			//Create buffer scene
 			bufferScene = new THREE.Scene();
 			//Create 2 buffer textures
+			// Sized in CSS pixels, so on HiDPI the simulation is upscaled (pixelated, per the CSS).
 			textureA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
 			textureB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
 			//Pass textureA to shader
@@ -374,8 +375,8 @@
 
 		function getCurrentKernel() {
 			let kernel = [...newKernel];
-			// Crossfade by wall-clock time (so it continues while paused). Unclamped: relies on setInterval
-			// swapping kernels as t hits 1, but a click restarts the fade and not the interval, so the
+			// Crossfade by wall-clock time (so it continues while paused). Relies on setInterval swapping
+			// kernels as the fade completes, but a click restarts the fade and not the interval, so the
 			// next swap comes early and jumps.
 			let t = easeInOutSine((Date.now() - timeOfLastKernelGen) / kernelChangeInterval);
 			for (let i = 0; i < kernel.length; i++) {
