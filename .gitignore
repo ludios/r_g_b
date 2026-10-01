@@ -1,12 +1,15 @@
 node_modules
 
 # Output
-/dist
+/.svelte-kit
+/build
 
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Claude Code, git worktrees for other agents
+# Syncthing, Claude Code, git worktrees for other agents
+/.stfolder
+/.stignore
 /.claude
 .worktrees/

@@ -5,12 +5,15 @@
 	"description": "a WebGL feedback loop that grows stripes from three dots",
 	"type": "module",
 	"scripts": {
-		"dev": "vite",
-		"build": "tsc && vite build",
+		"dev": "vite dev",
+		"build": "vite build",
 		"preview": "vite preview",
-		"check": "tsc",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "oxlint",
-		"lint:fix": "oxlint --fix"
+		"lint:fix": "oxlint --fix",
+		"test": "vitest run"
 	},
 	"devEngines": {
 		"packageManager": {
@@ -20,13 +23,22 @@
 		}
 	},
 	"dependencies": {
+		"@logtape/logtape": "^2.3.5",
+		"ayy": "^4.1.0",
 		"three": "^0.186.1"
 	},
 	"devDependencies": {
+		"@sveltejs/adapter-static": "^3.0.10",
+		"@sveltejs/kit": "^2.70.3",
+		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@types/three": "^0.186.0",
+		"fast-check": "^4.9.0",
 		"oxlint": "^1.86.0",
 		"oxlint-tsgolint": "^7.0.2003",
-		"typescript": "^7.0.2",
-		"vite": "^8.3.1"
+		"svelte": "^5.57.0",
+		"svelte-check": "^4.7.6",
+		"typescript": "^6.0.3",
+		"vite": "^8.3.1",
+		"vitest": "^4.1.11"
 	}
 }

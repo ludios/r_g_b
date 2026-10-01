@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Deterministic screenshots of r_g_b.html, for checking that a refactor doesn't change the output.
+"""Deterministic screenshots of the page, for checking that a refactor doesn't change the output.
 
-    test/snapshot.py PAGE OUTDIR [--frames N] [--seed S]
+    test/snapshot.py SOURCE OUTDIR [--frames N] [--seed S]
     test/snapshot.py --diff DIR1 DIR2
 
-PAGE is a file, or REV:FILE from git (e.g. HEAD:r_g_b.html), loaded along with the rest of the tree
-at REV. If PAGE's directory has a vite.config.ts, the page is built first, unminified, with that
-directory's node_modules (for REV, the working tree's, so both sides of a dependency bump would
-build with the same versions). For each of a few mouse positions, headless Chrome (SwiftShader
-WebGL2) loads the page; once the DOM is loaded, it renders N more frames by calling the captured
-requestAnimationFrame callback, and saves the screen to OUTDIR/mouse-X-Y.png.
+SOURCE is the project's directory (normally .), or a git revision of the current repository. Either
+is copied to a scratch tree (a directory's tracked and untracked-but-not-ignored files; a revision's
+tree from git) and built there, unminified, with SOURCE's node_modules (for a revision, the working
+tree's, so both sides of a dependency bump would build with the same versions): a SvelteKit project
+into build/index.html, a Vite one into dist/r_g_b.html; older trees' r_g_b.html is used as it is.
+
+For each of a few mouse positions, headless Chrome (SwiftShader WebGL2) loads the page from a local
+http server. Once the page has asked for an animation frame, it renders N more frames by calling the
+captured requestAnimationFrame callback, and posts the screen back, saved as OUTDIR/mouse-X-Y.png.
 
 Math.random is seeded, with separate streams for three.js's generateUUID and for everything else,
 so kernels don't depend on how many objects three.js creates; a page whose generateUUID can't be
@@ -17,10 +20,9 @@ found is an error. The mouse is placed by calling the mousemove listener as soon
 Date.now() and performance.now() start frozen and advance 500 ms per frame, so 150 frames cross the
 60 s kernel swap.
 
-Example: test/snapshot.py HEAD:r_g_b.html /tmp/a && test/snapshot.py r_g_b.html /tmp/b &&
-test/snapshot.py --diff /tmp/a /tmp/b
+Example: test/snapshot.py HEAD /tmp/a && test/snapshot.py . /tmp/b && test/snapshot.py --diff /tmp/a /tmp/b
 """
-import argparse, base64, concurrent.futures, html, json, os, re, struct, subprocess, sys, tempfile, zlib
+import argparse, base64, concurrent.futures, functools, http.server, json, os, re, shutil, signal, struct, subprocess, sys, tempfile, threading, zlib
 
 MICE = [(0.5, 0.5), (0.9, 0.3), (0.15, 0.75), (0.6, 0.97)]
 
@@ -61,10 +63,18 @@ PRE = """<script>
 """
 
 POST = """<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const out = document.createElement("pre");
-    out.id = "out";
+// The page may start asynchronously (SvelteKit imports its bundle), so this waits for its first
+// requestAnimationFrame.
+(function run(polls) {
+    if (!__frame && polls < 3000) {
+        setTimeout(run, 10, polls + 1);
+        return;
+    }
+    let result;
     try {
+        if (!__frame) {
+            throw new Error("the page never asked for an animation frame");
+        }
         for (let i = 0; i < %(frames)d; i++) {
             __elapsed += 500;
             const cb = __frame;
@@ -81,12 +91,12 @@ document.addEventListener("DOMContentLoaded", () => {
         gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
         let bin = "";
         for (let i = 0; i < px.length; i += 0x8000) bin += String.fromCharCode(...px.subarray(i, i + 0x8000));
-        out.textContent = JSON.stringify({ w, h, errors: __errors, px: btoa(bin) });
+        result = { w, h, errors: __errors, px: btoa(bin) };
     } catch (e) {
-        out.textContent = JSON.stringify({ errors: [...__errors, "harness: " + e.stack] });
+        result = { errors: [...__errors, "harness: " + e.stack] };
     }
-    document.body.append(out);
-});
+    fetch("/result/%(index)d", { method: "POST", body: JSON.stringify(result) });
+})(0);
 </script>
 """
 
@@ -114,44 +124,83 @@ def read_png(path):
     return w, h, [raw[y * (w * 4 + 1) + 1:(y + 1) * (w * 4 + 1)] for y in range(h)]
 
 
-def load_page(page, tmp):
-    """Returns (html, directory that relative URLs resolve against)."""
-    rev, sep, path = page.partition(":")
-    if sep and not os.path.exists(page):
+def build(source, tmp):
+    """Copies SOURCE to a scratch tree under tmp and builds it; returns (directory to serve, page)."""
+    tree = os.path.join(tmp, "tree")
+    os.mkdir(tree)
+    if os.path.isdir(source):
+        top = source
+        listed = subprocess.run(["git", "-C", source, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                                capture_output=True, check=True).stdout.decode().split("\0")
+        for name in listed:
+            if name and os.path.isfile(os.path.join(source, name)):  # Deleted files are still listed
+                os.makedirs(os.path.dirname(os.path.join(tree, name)), exist_ok=True)
+                shutil.copy2(os.path.join(source, name), os.path.join(tree, name))
+    else:
         top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
                              check=True).stdout.strip()
-        tree = os.path.join(tmp, "tree")
-        os.mkdir(tree)
-        archive = subprocess.run(["git", "-C", top, "archive", rev], capture_output=True, check=True).stdout
+        archive = subprocess.run(["git", "-C", top, "archive", source], capture_output=True, check=True).stdout
         subprocess.run(["tar", "-x", "-C", tree], input=archive, check=True)
-        os.symlink(os.path.join(top, "node_modules"), os.path.join(tree, "node_modules"))
-        page = os.path.join(tree, path)
-    root = os.path.dirname(os.path.abspath(page))
-    if os.path.exists(os.path.join(root, "vite.config.ts")):
-        # Unminified, so that PRE can find generateUUID in stacks.
-        dist = os.path.join(tmp, "dist")
-        subprocess.run([os.path.join(root, "node_modules/.bin/vite"), "build", "--logLevel", "error",
-                        "--minify", "false", "--outDir", dist, "--emptyOutDir"], cwd=root, check=True)
-        page = os.path.join(dist, os.path.basename(page))
-    return open(page).read(), os.path.dirname(os.path.abspath(page))
+    if os.path.exists(os.path.join(top, "node_modules")):
+        os.symlink(os.path.abspath(os.path.join(top, "node_modules")), os.path.join(tree, "node_modules"))
+    # Unminified, so that PRE can find generateUUID in stacks.
+    vite = [os.path.join(tree, "node_modules/.bin/vite"), "build", "--logLevel", "error", "--minify", "false"]
+    if os.path.exists(os.path.join(tree, "svelte.config.js")):
+        subprocess.run(vite, cwd=tree, check=True, stdout=subprocess.DEVNULL)  # The adapter chats there
+        return os.path.join(tree, "build"), "index.html"
+    if os.path.exists(os.path.join(tree, "vite.config.ts")):
+        subprocess.run(vite + ["--outDir", "dist", "--emptyOutDir"], cwd=tree, check=True)
+        return os.path.join(tree, "dist"), "r_g_b.html"
+    return tree, "r_g_b.html"
 
 
-def snapshot(src, base, outdir, mouse, frames, seed):
+class Server(http.server.ThreadingHTTPServer):
+    """Serves the pages under a directory, and takes their results by POST /result/<index>."""
+
+    def __init__(self, directory):
+        self.directory = directory
+        self.results = {}
+        self.arrived = threading.Condition()
+
+        class Handler(http.server.SimpleHTTPRequestHandler):
+            def do_POST(handler):
+                body = handler.rfile.read(int(handler.headers["Content-Length"]))
+                with self.arrived:
+                    self.results[int(handler.path.rsplit("/", 1)[1])] = json.loads(body)
+                    self.arrived.notify_all()
+                handler.send_response(204)
+                handler.end_headers()
+
+            def log_message(handler, *args):
+                pass
+
+        super().__init__(("127.0.0.1", 0), functools.partial(Handler, directory=directory))
+
+    def wait_for(self, index, timeout):
+        with self.arrived:
+            self.arrived.wait_for(lambda: index in self.results, timeout)
+            return self.results.get(index, {"errors": ["harness: no result in %d s" % timeout]})
+
+
+def snapshot(server, served, page, index, outdir, mouse, frames, seed):
+    """Loads a copy of the page at /<index>/ with the mouse at `mouse`; returns (file name, w, h, errors)."""
     pre = PRE % {"seed": seed, "mouseX": mouse[0], "mouseY": mouse[1]}
-    page = src.replace("<head>", f'<head>\n<base href="file://{base}/">\n' + pre, 1)
-    end = page.rindex("</body>")
-    page = page[:end] + POST % {"frames": frames} + page[end:]
-    with tempfile.TemporaryDirectory() as tmp:
-        test_page = os.path.join(tmp, "page.html")
-        open(test_page, "w").write(page)
-        # --allow-file-access-from-files lets file:// pages import ES modules.
-        dom = subprocess.run(["google-chrome", "--headless=new", "--use-angle=swiftshader",
-                              "--enable-unsafe-swiftshader", "--allow-file-access-from-files",
-                              "--window-size=640,480", "--no-first-run", f"--user-data-dir={tmp}/profile",
-                              "--dump-dom", "file://" + test_page],
-                             capture_output=True, text=True, timeout=600).stdout
-    m = re.search(r'<pre id="out">(.*?)</pre>', dom, re.S)
-    res = json.loads(html.unescape(m.group(1))) if m else {"errors": ["harness: no output"]}
+    shutil.copytree(served, os.path.join(server.directory, str(index)))
+    path = os.path.join(server.directory, str(index), page)
+    src = open(path).read().replace("<head>", "<head>\n" + pre, 1)
+    end = src.rindex("</body>")
+    open(path, "w").write(src[:end] + POST % {"frames": frames, "index": index} + src[end:])
+    with tempfile.TemporaryDirectory() as profile:
+        chrome = subprocess.Popen(["google-chrome", "--headless=new", "--use-angle=swiftshader",
+                                   "--enable-unsafe-swiftshader", "--window-size=640,480", "--no-first-run",
+                                   f"--user-data-dir={profile}",
+                                   f"http://127.0.0.1:{server.server_port}/{index}/{page}"],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        try:
+            res = server.wait_for(index, 600)
+        finally:
+            os.killpg(chrome.pid, signal.SIGTERM)
+            chrome.wait()
     name = "mouse-%.2f-%.2f.png" % mouse
     if "px" in res:
         write_png(os.path.join(outdir, name), res["w"], res["h"], base64.b64decode(res["px"]))
@@ -192,9 +241,15 @@ def main():
     for name in os.listdir(args.b):
         if re.fullmatch(r"mouse-.*\.png", name):
             os.remove(os.path.join(args.b, name))
-    with tempfile.TemporaryDirectory() as tmp, concurrent.futures.ThreadPoolExecutor() as pool:
-        src, base = load_page(args.a, tmp)
-        results = list(pool.map(lambda m: snapshot(src, base, args.b, m, args.frames, args.seed), MICE))
+    with tempfile.TemporaryDirectory() as tmp:
+        served, page = build(args.a, tmp)
+        os.mkdir(os.path.join(tmp, "www"))
+        server = Server(os.path.join(tmp, "www"))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            results = list(pool.map(lambda im: snapshot(server, served, page, im[0], args.b, im[1], args.frames, args.seed),
+                                    enumerate(MICE)))
+        server.shutdown()
     for name, w, h, errors in results:
         print(f"{name}: {w}x{h}" + "".join(f"\n  {e}" for e in errors))
     sys.exit(1 if any(errors for *_, errors in results) else 0)

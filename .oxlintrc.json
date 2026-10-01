@@ -8,6 +8,7 @@
 
 	"env": {
 		"browser": true,
+		"node": true,
 		"es2022": true
 	},
 
@@ -17,7 +18,9 @@
 		"unicorn",
 		"oxc",
 		"import",
-		"promise"
+		"promise",
+		"node",
+		"vitest"
 	],
 
 	"categories": {
@@ -31,17 +34,25 @@
 	},
 
 	"ignorePatterns": [
-		"dist/**",
+		".svelte-kit/**",
+		"build/**",
 		".worktrees/**",
-		".claude/worktrees/**"
+		".claude/worktrees/**",
+		"static/**"
 	],
 
 	"rules": {
+		"no-console": "warn",
 		"no-debugger": "error",
 		// https://typescript-eslint.io/rules/consistent-return/
 		// False-positives on exhaustive switches and `never`-returning tails,
 		// which tsc's own TS2366 check understands correctly.
 		"typescript/consistent-return": "off",
+		// https://typescript-eslint.io/rules/no-unsafe-type-assertion/
+		// We cast deliberately at I/O boundaries (JSON we generated ourselves).
+		"typescript/no-unsafe-type-assertion": "off",
+		// SvelteKit has things like `import './layout.css';`
+		"no-unassigned-import": "off",
 		"typescript/no-unused-vars": [
 			"error",
 			{
@@ -50,6 +61,33 @@
 			}
 		],
 		"typescript/no-explicit-any": "warn",
-		"typescript/consistent-type-imports": "error"
-	}
+		"typescript/consistent-type-imports": "error",
+		"unicorn/prefer-node-protocol": "error"
+	},
+
+	"overrides": [
+		{
+			"files": [
+				"**/*.test.{js,ts}",
+				"**/*.spec.{js,ts}",
+				"src/**/*.svelte.{js,ts}"
+			],
+			"env": {
+				"vitest": true
+			},
+			"rules": {
+				"no-console": "off"
+			}
+		},
+		{
+			"files": [
+				"vite.config.ts",
+				"vitest.config.ts",
+				"svelte.config.js"
+			],
+			"rules": {
+				"no-console": "off"
+			}
+		}
+	]
 }
