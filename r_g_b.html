@@ -13,8 +13,9 @@
 	<meta name="twitter:site" content="@v21">
 	<meta name="twitter:creator" content="@v21">
 
-	<!-- three.js r186. ES modules don't load from file:// in Chrome; serve this directory over http. -->
-	<script type="importmap">{ "imports": { "three": "./three.module.js" } }</script>
+	<!-- three.js r186. Browsers won't load ES modules into a file:// page; serve this directory over http. -->
+	<link rel="modulepreload" href="three.module.js">
+	<link rel="modulepreload" href="three.core.js">
 
 	<style>
 		* {
@@ -116,7 +117,7 @@
 		}
 	</script>
 	<script type="module">
-		import * as THREE from "three";
+		import * as THREE from "./three.module.js";
 
 		const KERNEL_FADE_MS = 60 * 1000;
 		const GRAY = 0.05; // Fresh buffers' color; see the top comment for why not black
