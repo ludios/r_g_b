@@ -4,12 +4,15 @@
     test/snapshot.py PAGE OUTDIR [--frames N] [--seed S]
     test/snapshot.py --diff DIR1 DIR2
 
-PAGE is a file, or REV:FILE from git (e.g. HEAD:r_g_b.html). For each of a few mouse positions,
-headless Chrome (SwiftShader WebGL2) loads the page with Math.random seeded, renders N more frames
-by calling the captured requestAnimationFrame callback, and saves the screen to OUTDIR/mouse-X-Y.png.
-The mouse is placed by calling the mousemove listener as soon as it's added. Date.now() returns T0
-on its first call (when the page starts its kernel crossfade) and T0 + 30 s after, so frames use a
-half-faded kernel.
+PAGE is a file, or REV:FILE from git (e.g. HEAD:r_g_b.html), loaded along with the rest of the tree
+at REV. For each of a few mouse positions, headless Chrome (SwiftShader WebGL2) loads the page; once
+the DOM is loaded, it renders N more frames by calling the captured requestAnimationFrame callback,
+and saves the screen to OUTDIR/mouse-X-Y.png.
+
+Math.random is seeded, with separate streams for the page and for libraries (three.js uses it for
+UUIDs), so kernels don't depend on how many objects the library creates. The mouse is placed by
+calling the mousemove listener as soon as it's added. Date.now() and performance.now() start frozen
+and advance 500 ms per frame, so 150 frames cross the 60 s kernel swap.
 
 Example: test/snapshot.py HEAD:r_g_b.html /tmp/a && test/snapshot.py r_g_b.html /tmp/b &&
 test/snapshot.py --diff /tmp/a /tmp/b
@@ -20,15 +23,18 @@ MICE = [(0.5, 0.5), (0.9, 0.3), (0.15, 0.75), (0.6, 0.97)]
 
 PRE = """<script>
 (() => {
-    let s = %(seed)d;
-    Math.random = () => { // mulberry32
+    const mulberry32 = s => () => {
         s = s + 0x6D2B79F5 | 0;
         let t = Math.imul(s ^ s >>> 15, 1 | s);
         t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
-    let clockCalls = 0;
-    Date.now = () => 1e12 + (clockCalls++ === 0 ? 0 : 30000);
+    const pageRandom = mulberry32(%(seed)d), libraryRandom = mulberry32(~%(seed)d);
+    // Stack line 2 is Math.random's caller.
+    Math.random = () => new Error().stack.split("\\n")[2].includes("/page.html:") ? pageRandom() : libraryRandom();
+    window.__elapsed = 0;
+    Date.now = () => 1e12 + __elapsed;
+    performance.now = () => 1000 + __elapsed;
     window.__frame = null;
     window.requestAnimationFrame = cb => { __frame = cb; return 1; };
     window.cancelAnimationFrame = () => { __frame = null; };
@@ -51,14 +57,15 @@ PRE = """<script>
 """
 
 POST = """<script>
-(() => {
+document.addEventListener("DOMContentLoaded", () => {
     const out = document.createElement("pre");
     out.id = "out";
     try {
         for (let i = 0; i < %(frames)d; i++) {
+            __elapsed += 500;
             const cb = __frame;
             __frame = null;
-            cb(i * 1000 / 60);
+            cb(performance.now());
         }
         const gl = [...document.querySelectorAll("canvas")].map(c => c.getContext("webgl2")).find(Boolean);
         const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
@@ -72,7 +79,7 @@ POST = """<script>
         out.textContent = JSON.stringify({ errors: [...__errors, "harness: " + e.stack] });
     }
     document.body.append(out);
-})();
+});
 </script>
 """
 
@@ -100,15 +107,15 @@ def read_png(path):
     return w, h, [raw[y * (w * 4 + 1) + 1:(y + 1) * (w * 4 + 1)] for y in range(h)]
 
 
-def load_page(page):
+def load_page(page, tmp):
     """Returns (html, directory that relative URLs resolve against)."""
     rev, sep, path = page.partition(":")
     if sep and not os.path.exists(page):
         top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
                              check=True).stdout.strip()
-        src = subprocess.run(["git", "-C", top, "show", f"{rev}:{path}"], capture_output=True, text=True,
-                             check=True).stdout
-        return src, os.path.join(top, os.path.dirname(path))
+        archive = subprocess.run(["git", "-C", top, "archive", rev], capture_output=True, check=True).stdout
+        subprocess.run(["tar", "-x", "-C", tmp], input=archive, check=True)
+        page = os.path.join(tmp, path)
     return open(page).read(), os.path.dirname(os.path.abspath(page))
 
 
@@ -120,9 +127,11 @@ def snapshot(src, base, outdir, mouse, frames, seed):
     with tempfile.TemporaryDirectory() as tmp:
         test_page = os.path.join(tmp, "page.html")
         open(test_page, "w").write(page)
+        # --allow-file-access-from-files lets file:// pages import ES modules.
         dom = subprocess.run(["google-chrome", "--headless=new", "--use-angle=swiftshader",
-                              "--enable-unsafe-swiftshader", "--window-size=640,480", "--no-first-run",
-                              f"--user-data-dir={tmp}/profile", "--dump-dom", "file://" + test_page],
+                              "--enable-unsafe-swiftshader", "--allow-file-access-from-files",
+                              "--window-size=640,480", "--no-first-run", f"--user-data-dir={tmp}/profile",
+                              "--dump-dom", "file://" + test_page],
                              capture_output=True, text=True, timeout=600).stdout
     m = re.search(r'<pre id="out">(.*?)</pre>', dom, re.S)
     res = json.loads(html.unescape(m.group(1))) if m else {"errors": ["harness: no output"]}
@@ -162,9 +171,12 @@ def main():
     if args.diff:
         sys.exit(0 if diff(args.a, args.b) else 1)
 
-    src, base = load_page(args.a)
     os.makedirs(args.b, exist_ok=True)
-    with concurrent.futures.ThreadPoolExecutor() as pool:
+    for name in os.listdir(args.b):
+        if re.fullmatch(r"mouse-.*\.png", name):
+            os.remove(os.path.join(args.b, name))
+    with tempfile.TemporaryDirectory() as tmp, concurrent.futures.ThreadPoolExecutor() as pool:
+        src, base = load_page(args.a, tmp)
         results = list(pool.map(lambda m: snapshot(src, base, args.b, m, args.frames, args.seed), MICE))
     for name, w, h, errors in results:
         print(f"{name}: {w}x{h}" + "".join(f"\n  {e}" for e in errors))
