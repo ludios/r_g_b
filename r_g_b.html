@@ -75,12 +75,12 @@
 		// WebGL2 prefix #defines texture2D and gl_FragColor.
 		uniform vec2 res;                // The width and height of our screen
 		uniform sampler2D bufferTexture; // Our input texture (the previous frame)
-		uniform sampler2D videoTexture;  // not a video: the seed-dot canvas
-		uniform float kernel[25];        // row-major 5x5 weights, summing to 1
-		uniform float time;              // unused
-		uniform float grayFactor;        // unused (see commented-out code below)
-		uniform float sampleOffset;      // tap spacing in pixels
-		uniform float alpha;             // how much of the previous frame to keep (not an alpha channel)
+		uniform sampler2D videoTexture;  // Not a video: the seed-dot canvas
+		uniform float kernel[25];        // Row-major 5x5 weights, summing to 1
+		uniform float time;              // Unused
+		uniform float grayFactor;        // Unused (see commented-out code below)
+		uniform float sampleOffset;      // Tap spacing in pixels
+		uniform float alpha;             // How much of the previous frame to keep (not an alpha channel)
 
 		// noise from http://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
 		uint hash( uint x ) {
