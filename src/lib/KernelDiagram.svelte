@@ -255,10 +255,14 @@
 			{@const w = kernel[i]!}
 			{@const s = side(w)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<g class="tap" class:middle={i === MIDDLE} class:linked={linked.includes(i)} onpointerdown={(e) => down(e, i)} onpointerenter={() => (hover = i)}>
+			<g class="tap" class:middle={i === MIDDLE} onpointerdown={(e) => down(e, i)} onpointerenter={() => (hover = i)}>
 				<rect class="cell" x={x} y={y} width={CELL} height={CELL} />
 				<rect class="weight" class:negative={w < 0} class:over={over(w)} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
 			</g>
+		{/each}
+		{#each [MIDDLE, ...linked] as i (i)}
+			{@const { x, y } = cell(i)}
+			<rect class="outline" class:middle={i === MIDDLE} x={x} y={y} width={CELL} height={CELL} />
 		{/each}
 	</svg>
 	<figcaption>
@@ -298,11 +302,14 @@
 		stroke: var(--rule);
 		stroke-width: 1;
 	}
-	.middle .cell {
-		stroke: var(--accent);
-	}
-	.linked .cell {
+	/* Drawn after every cell, so no neighbor's edge covers them. */
+	.outline {
+		fill: none;
 		stroke: var(--text);
+		pointer-events: none;
+	}
+	.outline.middle {
+		stroke: var(--accent);
 	}
 	.weight {
 		fill: var(--text);
