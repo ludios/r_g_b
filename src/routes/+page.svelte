@@ -412,12 +412,22 @@
 		}
 	}
 
+	/** Whether the mouse, given `target` on `axis`, moves Contrast or Drift, which reshape the kernel. */
+	function shapes_kernel(target: MouseTarget | null, axis: "x" | "y"): boolean {
+		return target === "contrast" || target === "drift" || (target === "r_g_b" && axis === "x");
+	}
+
 	/**
-	 * Moves what the mouse is given to the pointer's place across the window.
+	 * Moves what the mouse is given to the pointer's place across the window, but for Contrast and
+	 * Drift while the kernel isn't random.
 	 * @param along 0 at the left or top, 1 at the right or bottom.
 	 * @param axis Which way `along` runs, for what r_g_b.html gave each.
 	 */
 	function follow(target: MouseTarget | null, along: number, axis: "x" | "y"): void {
+		// A preset or an edited kernel stays as it was chosen or made.
+		if (source.kind !== "seed" && shapes_kernel(target, axis)) {
+			return;
+		}
 		if (target === "r_g_b" && axis === "x") {
 			settings.contrast = Number((0.8 + 3 * along).toPrecision(4));
 		} else if (target === "r_g_b" || target === "spacing_persistence") {
@@ -686,6 +696,9 @@
 							{/each}
 						</div>
 					</div>
+					{#if source.kind !== "seed" && (shapes_kernel(settings.mouse_x, "x") || shapes_kernel(settings.mouse_y, "y"))}
+						<p class="muted">The mouse leaves Contrast and Drift alone while the kernel is a preset or edited.</p>
+					{/if}
 					<div class="row">
 						<span>Click</span>
 						<div class="choices">
@@ -735,7 +748,7 @@
 					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the Hinton Diagram's squares are their weights, hollow if negative. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat; to keep it so, when a square is dragged or typed in, the middle one takes up the difference.</p>
 					<p>“Tap” is a signal-processing term for one place a filter reads a sample and multiplies it by a weight. It comes from FIR filters built as a tapped delay line: a signal runs down a chain of delays, and each tap pulls off a copy and scales it. Here each tap is an offset from the pixel (x and y from −2 to 2, times Spacing) and a weight (its square in the diagram).</p>
 					<p>The Frequency Response map estimates what a step multiplies stripes' contrast by, for every stripe width and direction (flat in the middle, finer outward), before clipping: shaded where that's over 1, so they grow, and circled where fastest. A step can also shift stripes; half a cycle swaps bright and dark, and near that (hatched) they strobe.</p>
-					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them.</p>
+					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them. The mouse moves either only while the kernel is random, so a preset or an edited kernel stays as it was chosen or made.</p>
 					<p>Taps are Spacing apart, rounded to whole pixels, so fine stripes can look like wider ones to them, and the map roughly repeats. Jitter gives each pixel its own fixed spacing, blurring the repeats and tending to favor the widest stripes.</p>
 					<p>A flat ground stays flat, so something has to break it: Noise, a restart from stripes clicked on the Frequency Response map, paint, or the seeds. By default the seeds are a red, a green and a blue dot in a line through the middle, at 1/6, 1/2 and 5/6 of the window's longer side. With stamping on, each step paints them back over its result, so they stay put and keep feeding what grows around them; with it off, they're only where things start, and change like any other pixel.</p>
 					<p>Each step's result is stored at the Bit depth. At 8 bits every channel is rounded to one of 256 levels, so a change of less than half a level is lost: a blur slows as it spreads, then stops, leaving a soft trace of what it blurred. 16-bit and 32-bit floats round far more finely, so a blur gets much flatter before it stops (at 32, too flat to see), for more memory and time per step.</p>
