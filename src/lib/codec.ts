@@ -4,7 +4,7 @@
 // from the defaults is written. Reading is forgiving: anything missing or unreadable is the
 // default, and numbers past a slider's end are that end.
 import { MAX_SEED } from "./kernel";
-import { DEFAULT_SETTINGS, PARAMS, type Param, SLIDERS, type Settings, VIEWS, type View } from "./settings";
+import { DEFAULT_SETTINGS, PARAMS, PIXEL_SIZES, type Param, SEEDS, SLIDERS, type Settings, VIEWS } from "./settings";
 
 /** The query string's key for each setting; "k" is the seed. */
 const KEYS = {
@@ -15,7 +15,12 @@ const KEYS = {
 	jitter:      "j",
 	persistence: "p",
 	speed:       "v",
+	seeds:       "sd",
+	stamp:       "st",
 	ground:      "g",
+	noise:       "n",
+	pixel:       "px",
+	float:       "f",
 	view:        "vw",
 	mouse_x:     "mx",
 	mouse_y:     "my",
@@ -52,7 +57,7 @@ export function decode(query: string): Decoded {
 		const { min, max } = SLIDERS[key];
 		return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : d[key];
 	};
-	const flag = (key: "morph"): boolean => {
+	const flag = (key: "morph" | "stamp" | "float"): boolean => {
 		const raw = q.get(KEYS[key]);
 		return raw === "1" ? true : raw === "0" ? false : d[key];
 	};
@@ -60,9 +65,10 @@ export function decode(query: string): Decoded {
 		const raw = q.get(KEYS[key]);
 		return raw === "none" ? null : PARAMS.find((p) => p === raw) ?? d[key];
 	};
-	const view = (): View => {
-		const raw = q.get(KEYS.view);
-		return VIEWS.find((v) => v === raw) ?? d.view;
+	/** One of `options`, which are strings or numbers. */
+	const choice = <T>(key: keyof Settings, options: readonly T[], fallback: T): T => {
+		const raw = q.get(KEYS[key]);
+		return options.find((option) => String(option) === raw) ?? fallback;
 	};
 	const seed = Number(q.get("k") ?? NaN);
 	return {
@@ -74,8 +80,13 @@ export function decode(query: string): Decoded {
 			jitter:      number("jitter"),
 			persistence: number("persistence"),
 			speed:       number("speed"),
+			seeds:       choice("seeds", SEEDS, d.seeds),
+			stamp:       flag("stamp"),
 			ground:      number("ground"),
-			view:        view(),
+			noise:       number("noise"),
+			pixel:       choice("pixel", PIXEL_SIZES, d.pixel),
+			float:       flag("float"),
+			view:        choice("view", VIEWS, d.view),
 			mouse_x:     param("mouse_x"),
 			mouse_y:     param("mouse_y"),
 		},

@@ -4,7 +4,7 @@
 	import { replaceState } from "$app/navigation";
 	import { decode, encode } from "$lib/codec";
 	import { KernelMorph, MAX_SEED, next_seed, with_contrast } from "$lib/kernel";
-	import { DEFAULT_SETTINGS, PARAMS, type Param, SLIDERS, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
+	import { DEFAULT_SETTINGS, PARAMS, PIXEL_SIZES, type Param, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { local_storage } from "$lib/storage";
 	import { THEMES, type Theme, ThemeChoice, parse_theme } from "$lib/theme.svelte";
@@ -49,9 +49,21 @@
 		}
 	});
 
+	/** The simulation's size in its own pixels, which cover the window, maybe with some to spare. */
+	let width  = $state(0);
+	let height = $state(0);
+
 	function restart(): void {
-		sim?.restart(window.innerWidth, window.innerHeight, settings.ground);
+		const w = Math.ceil(window.innerWidth / settings.pixel);
+		const h = Math.ceil(window.innerHeight / settings.pixel);
+		sim?.restart({ width: w, height: h, ground: settings.ground, noise: settings.noise, seeds: settings.seeds, float: settings.float });
+		// Written, not read, so the effect below doesn't depend on them.
+		width  = w;
+		height = h;
 	}
+
+	// The settings of what a restart starts from restart it when they change.
+	$effect(restart);
 
 	function step(): void {
 		if (settings.morph) {
@@ -59,6 +71,7 @@
 		}
 		sim!.step({
 			kernel:      with_contrast(morph.kernel, settings.contrast),
+			stamp:       settings.stamp,
 			tap_spacing: settings.spacing,
 			jitter:      settings.jitter,
 			persistence: settings.persistence,
@@ -100,7 +113,7 @@
 		}
 		sim = new Simulation(canvas);
 		restart();
-		// A lost WebGL context loses the buffers (and three.js's clear color), so it restarts.
+		// A lost WebGL context loses the buffers, so it restarts.
 		canvas.addEventListener("webglcontextrestored", restart);
 
 		let frame = 0;
@@ -128,10 +141,6 @@
 		settings[key] = value_at(SLIDERS[key], event.currentTarget.valueAsNumber);
 	}
 
-	function on_ground(event: Event & { currentTarget: HTMLInputElement }): void {
-		slide("ground", event);
-		restart();
-	}
 
 	/** The settings given to the mouse follow it, and the controls fade with distance from it. */
 	function on_pointer_move(event: PointerEvent): void {
@@ -189,6 +198,7 @@
 	}
 
 	const PARAM_LABELS: Record<Param, string> = { contrast: "Contrast", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence" };
+	const SEED_LABELS:  Record<Seeds, string> = { rgb: "R G B dots", white: "White dot", pixel: "One pixel", none: "None" };
 	const VIEW_LABELS:  Record<View, string>  = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
 </script>
@@ -199,7 +209,7 @@
 
 <svelte:window onpointermove={on_pointer_move} onmouseout={on_mouse_out} onkeydown={on_key} onresize={restart} />
 
-<canvas bind:this={canvas} onclick={new_kernel}></canvas>
+<canvas bind:this={canvas} onclick={new_kernel} style:width="{width * settings.pixel}px" style:height="{height * settings.pixel}px"></canvas>
 
 <div class="chrome" bind:this={chrome} style:opacity={fade ? opacity : 1}>
 	<button type="button" class="toggle" onclick={() => (show_card = !show_card)}>{show_card ? "Hide controls" : "Show controls"}</button>
@@ -276,11 +286,35 @@
 
 				<fieldset>
 					<legend>Start</legend>
+					<div class="row">
+						<span>Seeds</span>
+						<div class="choices">
+							{#each SEEDS as seeds (seeds)}
+								<label><input type="radio" name="seeds" bind:group={settings.seeds} value={seeds} /> {SEED_LABELS[seeds]}</label>
+							{/each}
+							<label><input type="checkbox" bind:checked={settings.stamp} /> Stamped every step</label>
+						</div>
+					</div>
 					<label class="row">
 						<span>Ground</span>
-						<input type="range" min="0" max={SLIDERS.ground.positions} value={position_of(SLIDERS.ground, settings.ground)} oninput={on_ground} />
+						<input type="range" min="0" max={SLIDERS.ground.positions} value={position_of(SLIDERS.ground, settings.ground)} oninput={(e) => slide("ground", e)} />
 						<output>{settings.ground.toFixed(3)}</output>
 					</label>
+					<label class="row">
+						<span>Noise</span>
+						<input type="range" min="0" max={SLIDERS.noise.positions} value={position_of(SLIDERS.noise, settings.noise)} oninput={(e) => slide("noise", e)}
+							aria-valuetext="plus or minus {settings.noise}" />
+						<output>±{settings.noise.toFixed(3)}</output>
+					</label>
+					<div class="row">
+						<span>Pixel size</span>
+						<div class="choices">
+							{#each PIXEL_SIZES as pixel (pixel)}
+								<label><input type="radio" name="pixel" bind:group={settings.pixel} value={pixel} /> {pixel}</label>
+							{/each}
+							<label><input type="checkbox" bind:checked={settings.float} /> Float buffers</label>
+						</div>
+					</div>
 				</fieldset>
 
 				<fieldset>
@@ -335,13 +369,13 @@
 </div>
 
 <style>
-	/* The simulation is sized in CSS pixels, so on HiDPI it's upscaled, pixelated. A touch drag
-	   on it is the page's, not the browser's. */
+	/* The simulation's pixels are whole CSS pixels, so on HiDPI and at bigger pixel sizes it's
+	   upscaled, pixelated; its size is set inline. A touch drag on it is the page's, not the
+	   browser's. */
 	canvas {
 		position: fixed;
-		inset: 0;
-		width: 100%;
-		height: 100%;
+		top: 0;
+		left: 0;
 		display: block;
 		image-rendering: pixelated;
 		touch-action: none;

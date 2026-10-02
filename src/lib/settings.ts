@@ -15,6 +15,16 @@ export const PARAMS: readonly Param[] = ["contrast", "spacing", "jitter", "persi
 export const VIEWS = ["color", "red", "green", "blue", "change", "clipped"] as const;
 export type View = (typeof VIEWS)[number];
 
+/**
+ * What a restart stamps on the ground: the three R, G, B dots; one white dot, which grows the same
+ * in every channel; one white pixel; or nothing.
+ */
+export const SEEDS = ["rgb", "white", "pixel", "none"] as const;
+export type Seeds = (typeof SEEDS)[number];
+
+/** How many screen pixels one pixel of the simulation covers, across and down. */
+export const PIXEL_SIZES = [1, 2, 4, 8] as const;
+
 export interface Settings {
 	/** Scales each kernel weight's deviation from flat; 1 is the kernel as generated. */
 	contrast: number;
@@ -29,8 +39,17 @@ export interface Settings {
 	persistence: number;
 	/** Steps per display frame: a power of two, from 1/32 to 8. */
 	speed: number;
+	/** What a restart stamps on the ground, and whether each step stamps it again. */
+	seeds: Seeds;
+	stamp: boolean;
 	/** The gray that a restart fills the buffers with, 0 to 1. */
 	ground: number;
+	/** How far each channel of each pixel starts from the ground, at most. */
+	noise: number;
+	/** One of PIXEL_SIZES. */
+	pixel: number;
+	/** Whether the buffers hold half floats, rather than bytes that round to 1/255. */
+	float: boolean;
 	/** How the canvas shows each frame. */
 	view: View;
 	/** The setting that follows the pointer across the window, or none. */
@@ -46,7 +65,12 @@ export const DEFAULT_SETTINGS: Settings = {
 	jitter:      0.05,
 	persistence: 0,
 	speed:       1,
+	seeds:       "rgb",
+	stamp:       true,
 	ground:      0.05,
+	noise:       0,
+	pixel:       1,
+	float:       false,
 	view:        "color",
 	mouse_x:     null,
 	mouse_y:     null,
@@ -71,6 +95,7 @@ export const SLIDERS = {
 	persistence: { min: 0,      max: 1,     scale: "linear", positions: 400 },
 	speed:       { min: 1 / 32, max: 8,     scale: "log",    positions: 8 },
 	ground:      { min: 0,      max: 1,     scale: "linear", positions: 255 },
+	noise:       { min: 0,      max: 0.5,   scale: "linear", positions: 100 },
 } as const satisfies Record<string, Slider>;
 
 /**

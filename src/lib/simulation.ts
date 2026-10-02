@@ -3,13 +3,29 @@
 // The simulation on the GPU: ping-pong buffers, the step shader, and drawing to the canvas.
 import * as THREE from "three";
 import type { Kernel } from "./kernel";
-import { VIEWS, type View } from "./settings";
+import { type Seeds, VIEWS, type View } from "./settings";
 import screen_shader from "./screen.frag?raw";
 import sim_shader from "./sim.frag?raw";
+
+/** What a restart starts from. */
+export interface StartSettings {
+	/** The buffers' size in pixels. */
+	width: number;
+	height: number;
+	/** The gray the buffers start as, 0 to 1. */
+	ground: number;
+	/** How far each channel of each pixel starts from the ground, at most. */
+	noise: number;
+	seeds: Seeds;
+	/** Whether the buffers hold half floats rather than bytes, which round to 1/255. */
+	float: boolean;
+}
 
 /** What one step of the simulation does, besides convolving with the kernel. */
 export interface StepSettings {
 	kernel: Kernel;
+	/** Whether to stamp the seeds again. */
+	stamp: boolean;
 	/** The distance between neighboring taps, in buffer pixels. */
 	tap_spacing: number;
 	/** How far each pixel's tap spacing is scaled from 1, at most. */
@@ -19,13 +35,21 @@ export interface StepSettings {
 }
 
 /**
- * Draws the seed dots: R, G, B at 1/6, 1/2, 5/6 along the longer axis, solid out to r=2 and
- * fading to transparent by r=10.
+ * Draws the seeds: one dot or three (R, G, B at 1/6, 1/2, 5/6 along the longer axis), solid out to
+ * r=2 and fading to transparent by r=10; or a single white pixel in the middle; or nothing.
  * @param w The canvas's width in pixels.
  * @param h The canvas's height in pixels.
  */
-function draw_seeds(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-	for (const [color, along] of [["#f00", 1 / 6], ["#0f0", 3 / 6], ["#00f", 5 / 6]] as const) {
+function draw_seeds(ctx: CanvasRenderingContext2D, w: number, h: number, seeds: Seeds): void {
+	if (seeds === "pixel") {
+		ctx.fillStyle = "#fff";
+		ctx.fillRect(Math.floor(w / 2), Math.floor(h / 2), 1, 1);
+		return;
+	}
+	const dots = seeds === "rgb" ? [["#f00", 1 / 6], ["#0f0", 3 / 6], ["#00f", 5 / 6]] as const
+		: seeds === "white" ? [["#fff", 1 / 2]] as const
+		: [];
+	for (const [color, along] of dots) {
 		const [x, y] = w >= h
 			? [Math.round(along * w), Math.round(h / 2)]
 			: [Math.round(w / 2), Math.round(along * h)];
@@ -52,10 +76,14 @@ export class Simulation {
 		res:         { value: new THREE.Vector2() },
 		prev_frame:  { value: null as THREE.Texture | null },
 		seeds:       { value: null as THREE.Texture | null },
+		stamp:       { value: true },
 		kernel:      { value: [] as number[] },
 		tap_spacing: { value: 0 },
 		jitter:      { value: 0 },
 		persistence: { value: 0 },
+		starting:    { value: false },
+		ground:      { value: 0 },
+		noise:       { value: 0 },
 	};
 	#screen_uniforms = {
 		current:  { value: null as THREE.Texture | null },
@@ -82,30 +110,31 @@ export class Simulation {
 		const screen_material = new THREE.ShaderMaterial({ uniforms: this.#screen_uniforms, fragmentShader: screen_shader });
 		this.#screen_scene = new THREE.Scene().add(new THREE.Mesh(quad, screen_material));
 
+		this.#current = Simulation.#target(false);
+		this.#next    = Simulation.#target(false);
+	}
+
+	/** A buffer for restart() to size. */
+	static #target(float: boolean): THREE.WebGLRenderTarget {
 		// The step reads whole texels itself; showing a buffer on the canvas never blends them.
-		const target_options = {
+		return new THREE.WebGLRenderTarget(1, 1, {
+			type:          float ? THREE.HalfFloatType : THREE.UnsignedByteType,
 			minFilter:     THREE.NearestFilter,
 			magFilter:     THREE.NearestFilter,
 			depthBuffer:   false,
 			stencilBuffer: false,
-		};
-		this.#current = new THREE.WebGLRenderTarget(1, 1, target_options);
-		this.#next = new THREE.WebGLRenderTarget(1, 1, target_options);
+		});
 	}
 
-	/**
-	 * (Re)starts the simulation from just the seeds; the canvas's own size is left to CSS.
-	 * @param width The buffers' width in pixels.
-	 * @param height The buffers' height in pixels.
-	 * @param ground The gray the buffers start as, 0 to 1.
-	 */
-	restart(width: number, height: number, ground: number): void {
+	/** (Re)starts the simulation from the ground, noise and seeds; the canvas's own size is left to CSS. */
+	restart(start: StartSettings): void {
+		const { width, height } = start;
 		this.renderer.setSize(width, height, false);
 
 		const seed_canvas = document.createElement("canvas");
 		seed_canvas.width = width;
 		seed_canvas.height = height;
-		draw_seeds(seed_canvas.getContext("2d")!, width, height);
+		draw_seeds(seed_canvas.getContext("2d")!, width, height, start.seeds);
 		this.#seed_texture?.dispose();
 		this.#seed_texture = new THREE.CanvasTexture(seed_canvas);
 		this.#seed_texture.minFilter = THREE.LinearFilter;
@@ -113,26 +142,35 @@ export class Simulation {
 		// Freed here (along with anything left from a lost context); reallocated on first use.
 		this.#current.dispose();
 		this.#next.dispose();
+		if ((this.#current.texture.type === THREE.HalfFloatType) !== start.float) {
+			this.#current = Simulation.#target(start.float);
+			this.#next    = Simulation.#target(start.float);
+		}
 		this.#current.setSize(width, height);
 		this.#next.setSize(width, height);
-		// Both, so that the first step's change is from the ground. Alpha 0: nothing clipped.
-		this.renderer.setClearColor(new THREE.Color(ground, ground, ground), 0);
+
+		const u = this.#sim_uniforms;
+		u.res.value.set(width, height);
+		u.seeds.value  = this.#seed_texture;
+		u.ground.value = start.ground;
+		u.noise.value  = start.noise;
+		// Both buffers, so that the first step's change is from the start.
+		u.starting.value = true;
 		for (const target of [this.#current, this.#next]) {
 			this.renderer.setRenderTarget(target);
-			this.renderer.clear();
+			this.renderer.render(this.#sim_scene, this.#camera);
 		}
-
-		this.#sim_uniforms.res.value.set(width, height);
-		this.#sim_uniforms.seeds.value = this.#seed_texture;
+		u.starting.value = false;
 	}
 
 	/** Runs one step of the simulation. */
 	step(settings: StepSettings): void {
 		const u = this.#sim_uniforms;
-		u.prev_frame.value = this.#current.texture;
-		u.kernel.value = settings.kernel;
+		u.prev_frame.value  = this.#current.texture;
+		u.kernel.value      = settings.kernel;
+		u.stamp.value       = settings.stamp;
 		u.tap_spacing.value = settings.tap_spacing;
-		u.jitter.value = settings.jitter;
+		u.jitter.value      = settings.jitter;
 		u.persistence.value = settings.persistence;
 
 		this.renderer.setRenderTarget(this.#next);
@@ -142,9 +180,9 @@ export class Simulation {
 
 	/** Shows the latest frame on the canvas. */
 	draw(view: View): void {
-		this.#screen_uniforms.current.value = this.#current.texture;
+		this.#screen_uniforms.current.value  = this.#current.texture;
 		this.#screen_uniforms.previous.value = this.#next.texture;
-		this.#screen_uniforms.view.value = VIEWS.indexOf(view);
+		this.#screen_uniforms.view.value     = VIEWS.indexOf(view);
 		this.renderer.setRenderTarget(null);
 		this.renderer.render(this.#screen_scene, this.#camera);
 	}
