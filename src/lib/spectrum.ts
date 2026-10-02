@@ -176,10 +176,14 @@ export interface Motion {
 	speed: number | null;
 }
 
-/** How a mode looks; within a tenth of half a turn of inverting, it's said to invert. */
+/** Whether a step about inverts stripes: shifts them more than 0.45 of a cycle (half inverts them). */
+export function inverts(phase: number): boolean {
+	return Math.abs(phase) > 0.9 * Math.PI;
+}
+
+/** How a mode looks. */
 export function motion(mode: Mode): Motion {
 	const f = Math.hypot(mode.fx, mode.fy);
 	A.gt(f, 0);
-	const inverts = Math.abs(mode.phase) > 0.9 * Math.PI;
-	return { period: 1 / f, speed: inverts ? null : Math.abs(mode.phase) / (2 * Math.PI * f) };
+	return { period: 1 / f, speed: inverts(mode.phase) ? null : Math.abs(mode.phase) / (2 * Math.PI * f) };
 }

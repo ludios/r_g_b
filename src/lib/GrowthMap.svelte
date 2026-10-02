@@ -4,7 +4,7 @@
 	// farther out, and across the direction it lies in. Growing waves are shaded in the accent, more
 	// for faster; a hairline rings them; hatching marks those that invert each step. With jitter,
 	// the copies of the middle square, which the taps can't tell from it, fade.
-	import { type GrowthMap, type Mode, type StepModel, fastest, growth_map, mode_at, motion } from "./spectrum";
+	import { type GrowthMap, type Mode, type StepModel, fastest, growth_map, inverts, mode_at, motion } from "./spectrum";
 
 	interface Props {
 		model: StepModel;
@@ -86,7 +86,7 @@
 				} else if (growth > 1) {
 					// Any growth shows; ×4 a step or more is the full accent.
 					const t = 0.25 + 0.75 * Math.min(1, Math.log(growth) / Math.log(4));
-					const hatched = Math.abs(m.phase[i]!) > Math.PI / 2 && (row + column) % 4 === 0;
+					const hatched = inverts(m.phase[i]!) && (row + column) % 4 === 0;
 					color = mix(card, accent, hatched ? t * 0.35 : t);
 				}
 				image.data.set([...color, 255], i * 4);
