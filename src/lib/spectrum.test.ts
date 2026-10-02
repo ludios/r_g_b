@@ -1,7 +1,7 @@
 // Model-output: Claude Opus 5.5
 import { assert, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
-import { type Kernel, PRESETS, TAPS, gen_kernel, seeded_kernel } from "./kernel";
+import { type Kernel, PRESETS, TAPS, TRANSFORMS, gen_kernel, seeded_kernel } from "./kernel";
 import { SLIDERS } from "./settings";
 import { type StepModel, fastest, growing, growth_map, mode_at, motion, multiplier } from "./spectrum";
 
@@ -181,5 +181,12 @@ describe("presets", () => {
 			// cos(2 pi fy y - 2 pi fy) is the level stripes cos(2 pi fy y) a tap higher.
 			expect(multiplier(model, 0, fy).phase).toBeCloseTo(-2 * Math.PI * fy, 12);
 		}
+	});
+
+	test("the pinwheel grows stripes fastest about 21 degrees counterclockwise of level, and mirrored, clockwise", () => {
+		const turned = [0, 10, 21, 30, 45].map((degrees) => fastest_along(PRESETS.pinwheel, degrees));
+		expect(Math.max(...turned)).toBe(turned[2]);
+		expect(fastest_along(PRESETS.pinwheel, -21)).toBeLessThan(turned[0]!);
+		expect(fastest_along(TRANSFORMS.mirror(PRESETS.pinwheel), -21)).toBeCloseTo(turned[2]!, 9);
 	});
 });

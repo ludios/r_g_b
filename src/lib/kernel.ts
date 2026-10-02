@@ -41,6 +41,11 @@ function kernel_of(weight: (x: number, y: number) => number): Kernel {
 	return Array.from({ length: TAPS }, (_, i) => weight(tap_offset(i).x, tap_offset(i).y));
 }
 
+/** The circles preset's weight at `x`, `y`: the same all around each ring of taps. */
+function circle_weight(x: number, y: number): number {
+	return ({ 0: 0.96, 1: 0.37, 2: -0.08, 4: -0.13, 5: -0.07, 8: -0.01 })[x * x + y * y] ?? 0;
+}
+
 /** Kernels that each show one behavior, by name. */
 export const PRESETS = {
 	/** Every pixel stays as it is. */
@@ -63,7 +68,14 @@ export const PRESETS = {
 	 */
 	ring:     kernel_of((x, y) => ({ 0: 0.76, 1: 0.35, 2: 0.12, 4: -0.075, 5: -0.11, 8: -0.115 })[x * x + y * y] ?? 0),
 	/** The ring retuned: stripes about 4.2 taps apart grow alike at any angle, so a dot grows into circles. */
-	circles:  kernel_of((x, y) => ({ 0: 0.96, 1: 0.37, 2: -0.08, 4: -0.13, 5: -0.07, 8: -0.01 })[x * x + y * y] ?? 0),
+	circles:  kernel_of(circle_weight),
+	/**
+	 * The circles with a hand: x y (x^2 - y^2) is kept by a quarter turn and negated by a mirror,
+	 * and by its sign, the knight's-move taps of one hand gain 0.03 and the other's lose it. Stripes
+	 * turned about 21 degrees counterclockwise grow fastest, so a dot grows into tilted squares;
+	 * a mirror tilts them the other way.
+	 */
+	pinwheel: kernel_of((x, y) => circle_weight(x, y) + 0.03 * Math.sign(x * y * (x * x - y * y))),
 	/** The row and its quarter turn, halved: two diagonal stripes cross, and the clamp makes dots. */
 	dots:     kernel_of((x, y) => (x !== 0 && y !== 0 ? 0 : x === 0 && y === 0 ? 0.5 : Math.abs(x + y) === 1 ? 0.25 : -0.125)),
 	/**
