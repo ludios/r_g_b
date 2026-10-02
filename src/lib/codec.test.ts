@@ -44,10 +44,18 @@ describe("codec", () => {
 		decoded.forEach((k, i) => expect(k).toBeCloseTo(weights[i]!, 5));
 		expect(decoded.reduce((s, k) => s + k, 0)).toBeCloseTo(1, 14);
 		expect(decode("w=1,2,3&k=5").kernel).toBe(5);
+		expect(decode(`w=${Array.from({ length: 25 }, () => "1e308").join(",")}&k=6`).kernel).toBe(6);
 	});
 
 	test("writes only the seed for the defaults", () => {
 		expect(encode(DEFAULT_SETTINGS, 7)).toBe("k=7");
+	});
+
+	test("names a kernel only by a preset's own name or plain digits", () => {
+		for (const k of ["toString", "constructor", "__proto__", "", " 7", "0x10", "1e3", "4294967296"]) {
+			expect(decode(`k=${encodeURIComponent(k)}`).kernel).toBeNull();
+		}
+		expect(decode("k=4294967295").kernel).toBe(MAX_SEED);
 	});
 
 	test("reads junk as the defaults, and numbers past an end as that end", () => {

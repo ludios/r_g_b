@@ -117,12 +117,17 @@ function decode_kernel(q: URLSearchParams): KernelName | null {
 	if (weights.length === TAPS && weights.every(Number.isFinite)) {
 		// Any sum but 1 brightens or darkens flat areas, step after step.
 		const adjustment = (1 - weights.reduce((s, k) => s + k, 0)) / TAPS;
-		return weights.map((k) => k + adjustment);
+		const kernel = weights.map((k) => k + adjustment);
+		// Huge weights can sum past the largest number.
+		if (kernel.every(Number.isFinite)) {
+			return kernel;
+		}
 	}
-	const k = q.get("k");
-	if (k !== null && k in PRESETS) {
+	const k = q.get("k") ?? "";
+	if (Object.hasOwn(PRESETS, k)) {
 		return k as Preset;
 	}
-	const seed = Number(k ?? NaN);
-	return Number.isInteger(seed) && seed >= 0 && seed <= MAX_SEED ? seed : null;
+	// Only plain digits, as encode() writes them: Number() would also take "", " 7" and "0x10".
+	const seed = /^\d{1,10}$/.test(k) ? Number(k) : NaN;
+	return seed <= MAX_SEED ? seed : null;
 }
