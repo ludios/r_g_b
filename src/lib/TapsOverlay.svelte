@@ -3,7 +3,7 @@
 	// Where one pixel's taps land on screen, each marked like the kernel diagram's squares: filled
 	// if its weight is positive, hollow if negative, by area. Taps past an edge wrap around, as the
 	// step's do. Jitter, different at every pixel, isn't shown.
-	import { type Kernel, TAPS } from "./kernel";
+	import { type Kernel, TAPS, tap_offset, tap_pixels } from "./kernel";
 
 	interface Props {
 		kernel: Kernel;
@@ -30,8 +30,8 @@
 
 	const marks = $derived(Array.from({ length: TAPS }, (_, i) => {
 		// Rounded to whole pixels as the step rounds them; up on screen is +y in the kernel.
-		const ox = Math.floor(0.5 + spacing * ((i % 5) - 2)) * pixel;
-		const oy = Math.floor(0.5 + spacing * (Math.floor(i / 5) - 2)) * pixel;
+		const ox = tap_pixels(spacing, tap_offset(i).x) * pixel;
+		const oy = tap_pixels(spacing, tap_offset(i).y) * pixel;
 		const w  = kernel[i]!;
 		return {
 			x:        wrap(at.x + ox, width),

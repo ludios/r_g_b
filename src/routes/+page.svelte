@@ -7,9 +7,10 @@
 	import KernelDiagram from "$lib/KernelDiagram.svelte";
 	import TapsOverlay from "$lib/TapsOverlay.svelte";
 	import { type KernelName, decode, encode } from "$lib/codec";
-	import { BALANCES, type Balance, GROUPS, type Group, type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, TRANSFORMS, type Transform, group_of, growing, mutated, next_seed, with_contrast, with_delta, with_drift } from "$lib/kernel";
+	import { BALANCES, type Balance, GROUPS, type Group, type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, TRANSFORMS, type Transform, group_of, mutated, next_seed, with_contrast, with_delta, with_drift } from "$lib/kernel";
 	import { CLICKS, type Click, DEFAULT_SETTINGS, LIKE_R_G_B, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
+	import { growing } from "$lib/spectrum";
 	import { local_storage } from "$lib/storage";
 	import { THEMES, type Theme, ThemeChoice, parse_theme } from "$lib/theme.svelte";
 
@@ -252,10 +253,16 @@
 		take(mutated(shown, 0.03, Math.random));
 	}
 
-	/** Makes a kernel that grows stripes of `fx`, `fy` cycles per pixel, half again each step. */
+	/**
+	 * Makes a kernel that grows stripes of `fx`, `fy` cycles per pixel, half again each step, unless
+	 * the taps see them as flat.
+	 */
 	function grow(fx: number, fy: number): void {
-		remember();
-		take(growing(fx, fy, settings.spacing, 1.5));
+		const kernel = growing(fx, fy, settings.spacing, 1.5);
+		if (kernel !== null) {
+			remember();
+			take(kernel);
+		}
 	}
 
 	/** A random kernel number, small enough to read. */

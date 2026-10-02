@@ -2,7 +2,7 @@
 import { assert, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
 import { PRESETS, TAPS, gen_kernel, seeded_kernel } from "./kernel";
-import { type StepModel, fastest, growth_map, mode_at, motion, multiplier } from "./spectrum";
+import { type StepModel, fastest, growing, growth_map, mode_at, motion, multiplier } from "./spectrum";
 
 /** `n` modulo `m`, in [0, m) even for negative `n`. */
 function wrap(n: number, m: number): number {
@@ -74,6 +74,26 @@ describe("growth_map", () => {
 				expect(Math.cos(mode.phase) * mode.growth).toBeCloseTo(Math.cos(exact.phase) * exact.growth, 9);
 				expect(Math.sin(mode.phase) * mode.growth).toBeCloseTo(Math.sin(exact.phase) * exact.growth, 9);
 			}));
+	});
+});
+
+describe("growing", () => {
+	test("grows the wave it's made for as much as asked, fastest", () => {
+		const spacing = 8;
+		const kernel = growing(0.03, -0.02, spacing, 1.5)!;
+		const model = { kernel, spacing, jitter: 0, persistence: 0 };
+		expect(kernel.reduce((s, k) => s + k, 0)).toBeCloseTo(1, 12);
+		expect(multiplier(model, 0.03, -0.02).growth).toBeCloseTo(1.5, 9);
+		expect(fastest(growth_map(model, 101))!.growth).toBeLessThan(1.5 + 0.02);
+	});
+
+	test("won't grow what the taps see as flat, and keeps weights small elsewhere", () => {
+		expect(growing(0.1, 0, 10, 1.5)).toBeNull(); // An alias of flat: whole cycles at every tap
+		expect(growing(0.001, 0, 10, 1.5)).toBeNull(); // Far wider than the taps reach
+		assert(property(double({ min: -0.5, max: 0.5, noNaN: true }), double({ min: -0.5, max: 0.5, noNaN: true }), double({ min: 1, max: 40, noNaN: true }), (fx, fy, spacing) => {
+			const kernel = growing(fx, fy, spacing, 1.5);
+			expect(kernel === null || kernel.every((k) => Math.abs(k) < 5)).toBe(true);
+		}));
 	});
 });
 

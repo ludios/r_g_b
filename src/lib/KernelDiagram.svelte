@@ -3,7 +3,7 @@
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
 	// screen, whose area is the weight's size, filled if positive and hollow if negative. Dragging
 	// a square up or down changes its weight; the taps that move with it are outlined.
-	import { type Group, type Kernel, TAPS, group_of } from "./kernel";
+	import { type Group, type Kernel, TAPS, group_of, tap_offset } from "./kernel";
 
 	interface Props {
 		kernel: Kernel;
@@ -56,7 +56,7 @@
 
 	/** Where tap `i` reads from, in taps from the pixel itself; up is +y. */
 	function offset(i: number): string {
-		return `(${(i % 5) - 2}, ${Math.floor(i / 5) - 2})`;
+		return `(${tap_offset(i).x}, ${tap_offset(i).y})`;
 	}
 </script>
 

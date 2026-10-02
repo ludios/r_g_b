@@ -21,9 +21,22 @@ export const TAPS = 25;
 /** The weight of every tap of a flat kernel, which blurs evenly. */
 export const FLAT = 1 / TAPS;
 
-/** The kernel with weight `weight(x, y)` at each tap, x and y from -2 to 2 (up is +y). */
+/** Where tap `i` is in the kernel: x and y from -2 to 2, up being +y. */
+export function tap_offset(i: number): { x: number; y: number } {
+	return { x: (i % 5) - 2, y: Math.floor(i / 5) - 2 };
+}
+
+/**
+ * How many whole pixels along one axis a tap `d` taps out reads from, as sim.frag rounds it: a
+ * pixel's center is at a half-integer, and the texel under center + spacing d is the floor.
+ */
+export function tap_pixels(spacing: number, d: number): number {
+	return Math.floor(0.5 + spacing * d);
+}
+
+/** The kernel with weight `weight(x, y)` at each tap. */
 function kernel_of(weight: (x: number, y: number) => number): Kernel {
-	return Array.from({ length: TAPS }, (_, i) => weight((i % 5) - 2, Math.floor(i / 5) - 2));
+	return Array.from({ length: TAPS }, (_, i) => weight(tap_offset(i).x, tap_offset(i).y));
 }
 
 /** Kernels that each show one behavior, by name. */
@@ -159,7 +172,8 @@ function index_of(x: number, y: number): number {
 function moved(kernel: Kernel, to: (x: number, y: number) => [number, number]): Kernel {
 	const out = Array.from({ length: TAPS }, () => 0);
 	kernel.forEach((k, i) => {
-		out[index_of(...to((i % 5) - 2, Math.floor(i / 5) - 2))] = k;
+		const { x, y } = tap_offset(i);
+		out[index_of(...to(x, y))] = k;
 	});
 	return out;
 }
@@ -167,8 +181,7 @@ function moved(kernel: Kernel, to: (x: number, y: number) => [number, number]): 
 /** Each weight moved by `rate` times its differences from its up to 4 neighbors. */
 function diffused(kernel: Kernel, rate: number): Kernel {
 	return kernel.map((k, i) => {
-		const x = (i % 5) - 2;
-		const y = Math.floor(i / 5) - 2;
+		const { x, y } = tap_offset(i);
 		const neighbors = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([nx, ny]) => Math.abs(nx!) <= 2 && Math.abs(ny!) <= 2);
 		return k + rate * neighbors.reduce((sum, [nx, ny]) => sum + kernel[index_of(nx!, ny!)]! - k, 0);
 	});
@@ -202,15 +215,14 @@ export type Balance = (typeof BALANCES)[number];
 export function group_of(index: number, group: Group): number[] {
 	A.gte(index, 0);
 	A.lt(index, TAPS);
-	const x = (index % 5) - 2;
-	const y = Math.floor(index / 5) - 2;
+	const { x, y } = tap_offset(index);
 	if (group === "tap" || (x === 0 && y === 0)) {
 		return [index];
 	}
 	if (group === "pair") {
 		return [index, TAPS - 1 - index];
 	}
-	return Array.from({ length: TAPS }, (_, i) => i).filter((i) => ((i % 5) - 2) ** 2 + (Math.floor(i / 5) - 2) ** 2 === x * x + y * y);
+	return Array.from({ length: TAPS }, (_, i) => i).filter((i) => tap_offset(i).x ** 2 + tap_offset(i).y ** 2 === x * x + y * y);
 }
 
 /**
@@ -226,40 +238,6 @@ export function with_delta(kernel: Kernel, taps: number[], delta: number, balanc
 	}
 	const spread = total / (TAPS - taps.length);
 	return kernel.map((k, i) => (taps.includes(i) ? k + delta : k - spread));
-}
-
-/**
- * A kernel whose fastest-growing stripes are `fx`, `fy` cycles per pixel, standing still: flat
- * plus a cosine over where the taps land, as sim.frag rounds them. Its other copies, a whole number
- * of cycles per tap away, grow as fast.
- * @param growth What a step multiplies those stripes by, more than 1.
- */
-export function growing(fx: number, fy: number, spacing: number, growth: number): Kernel {
-	A.gt(growth, 1);
-	const wave = kernel_of((x, y) => Math.cos(2 * Math.PI * (fx * Math.floor(0.5 + spacing * x) + fy * Math.floor(0.5 + spacing * y))));
-	const mean = wave.reduce((sum, w) => sum + w, 0) / TAPS;
-	const bumps = wave.map((w) => w - mean);
-	// The response at f is flat's plus the scale times the bumps', so the scale solves
-	// |F + scale B| = growth.
-	const response = (k: Kernel) => {
-		let re = 0;
-		let im = 0;
-		k.forEach((w, i) => {
-			const a = 2 * Math.PI * (fx * Math.floor(0.5 + spacing * ((i % 5) - 2)) + fy * Math.floor(0.5 + spacing * (Math.floor(i / 5) - 2)));
-			re += w * Math.cos(a);
-			im += w * Math.sin(a);
-		});
-		return [re, im] as const;
-	};
-	const [fr, fi] = response(kernel_of(() => FLAT));
-	const [br, bi] = response(bumps);
-	// |F + s B|^2 = growth^2: a quadratic in s; the positive root.
-	const a = br * br + bi * bi;
-	const b = 2 * (fr * br + fi * bi);
-	const c = fr * fr + fi * fi - growth * growth;
-	A.gt(a, 0);
-	const scale = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
-	return bumps.map((w) => FLAT + scale * w);
 }
 
 /**
@@ -332,7 +310,8 @@ export class Kernels {
 	/** Takes weights edited by hand. */
 	edit(kernel: Kernel): void {
 		this.#set({ kind: "edited" }, kernel);
-		log.info("edited kernel {kernel}", { kernel: JSON.stringify(kernel) });
+		// Debug: a drag edits on every move.
+		log.debug("edited kernel {kernel}", { kernel: JSON.stringify(kernel) });
 	}
 
 	/**

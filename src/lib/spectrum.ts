@@ -6,7 +6,7 @@
 // turn. The step is linear but for the clamp, so a pattern is a sum of such stripes, each on its own
 // until the clamp catches it.
 import { A } from "ayy";
-import { type Kernel, TAPS } from "./kernel";
+import { FLAT, type Kernel, TAPS, tap_offset, tap_pixels } from "./kernel";
 
 /** The parts of the step that M depends on; see Settings for their meanings. */
 export interface StepModel {
@@ -54,9 +54,8 @@ export function multiplier(model: StepModel, fx: number, fy: number): Mode {
 	let re = 0;
 	let im = 0;
 	for (let i = 0; i < TAPS; i++) {
-		const dx    = (i % 5) - 2;
-		const dy    = Math.floor(i / 5) - 2;
-		const along = fx * Math.floor(0.5 + spacing * dx) + fy * Math.floor(0.5 + spacing * dy);
+		const { x: dx, y: dy } = tap_offset(i);
+		const along = fx * tap_pixels(spacing, dx) + fy * tap_pixels(spacing, dy);
 		const damp  = sinc(2 * Math.PI * jitter * spacing * (fx * dx + fy * dy));
 		re += kernel[i]! * damp * Math.cos(2 * Math.PI * along);
 		im += kernel[i]! * damp * Math.sin(2 * Math.PI * along);
@@ -85,12 +84,12 @@ export function growth_map(model: StepModel, size: number): GrowthMap {
 	const p     = Math.min(1, Math.max(-1, model.persistence));
 
 	// The phase each tap's offset gives a wave, per axis: at column or row k (from -half to half)
-	// and tap d (from -2 to 2), 2 pi k step floor(0.5 + spacing d).
+	// and tap d (from -2 to 2), 2 pi k step tap_pixels(spacing, d).
 	const cos = new Float64Array(size * 5);
 	const sin = new Float64Array(size * 5);
 	for (let k = -half; k <= half; k++) {
 		for (let d = -2; d <= 2; d++) {
-			const angle = 2 * Math.PI * k * step * Math.floor(0.5 + spacing * d);
+			const angle = 2 * Math.PI * k * step * tap_pixels(spacing, d);
 			cos[(k + half) * 5 + d + 2] = Math.cos(angle);
 			sin[(k + half) * 5 + d + 2] = Math.sin(angle);
 		}
@@ -166,6 +165,38 @@ export function fastest(map: GrowthMap): Mode | null {
 		}
 	}
 	return best === null ? null : mode_at(map, best);
+}
+
+/**
+ * A kernel whose fastest-growing stripes are `fx`, `fy` cycles per pixel, standing still: flat
+ * plus a cosine over where the taps land. Its other copies, a whole number of cycles per tap
+ * away, grow as fast. Null for stripes the taps see as nearly flat, which only huge weights
+ * could grow: the aliases of flat, and stripes much wider than the taps reach.
+ * @param growth What a step multiplies those stripes by, more than 1.
+ */
+export function growing(fx: number, fy: number, spacing: number, growth: number): Kernel | null {
+	A.gt(growth, 1);
+	const wave  = Array.from({ length: TAPS }, (_, i) => Math.cos(2 * Math.PI * (fx * tap_pixels(spacing, tap_offset(i).x) + fy * tap_pixels(spacing, tap_offset(i).y))));
+	const mean  = wave.reduce((sum, w) => sum + w, 0) / TAPS;
+	const bumps = wave.map((w) => w - mean);
+	// The bumps' response at f is about their energy, and the scale about growth over it, so
+	// below an energy of 1 the weights would pass a few.
+	if (bumps.reduce((sum, b) => sum + b * b, 0) < 1) {
+		return null;
+	}
+	// M(f) is flat's response plus the scale times the bumps', so the scale solves
+	// |F + scale B| = growth: a quadratic, whose positive root this is.
+	const at = (kernel: Kernel) => {
+		const { growth: g, phase } = multiplier({ kernel, spacing, jitter: 0, persistence: 0 }, fx, fy);
+		return [g * Math.cos(phase), g * Math.sin(phase)] as const;
+	};
+	const [fr, fi] = at(Array.from({ length: TAPS }, () => FLAT));
+	const [br, bi] = at(bumps);
+	const a = br * br + bi * bi;
+	const b = 2 * (fr * br + fi * bi);
+	const c = fr * fr + fi * fi - growth * growth;
+	const scale = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+	return bumps.map((w) => FLAT + scale * w);
 }
 
 /** A mode in pixels: how far apart its stripes are, and how far a step moves them. */

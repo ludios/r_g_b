@@ -1,8 +1,7 @@
 // Model-output: Claude Opus 5.5
 import { array, assert, constantFrom, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
-import { BALANCES, FLAT, GROUPS, Kernels, MAX_SEED, PRESETS, TAPS, TRANSFORMS, gen_kernel, group_of, growing, mutated, next_seed, seeded_kernel, with_contrast, with_delta, with_drift } from "./kernel";
-import { fastest, growth_map, multiplier } from "./spectrum";
+import { BALANCES, FLAT, GROUPS, Kernels, MAX_SEED, PRESETS, TAPS, TRANSFORMS, gen_kernel, group_of, mutated, next_seed, seeded_kernel, with_contrast, with_delta, with_drift } from "./kernel";
 
 /** Uniform draws in [0, 1), as many as a kernel takes: two per tap and one for the smoothing. */
 const draws = array(double({ min: 0, max: 1, maxExcluded: true, noNaN: true }), { minLength: 2 * TAPS + 1, maxLength: 2 * TAPS + 1 });
@@ -121,17 +120,6 @@ describe("with_delta", () => {
 	test("keeps a sparse kernel sparse when the middle makes up", () => {
 		const edited = with_delta(PRESETS.shift, [13], -0.5, "middle");
 		expect(edited.filter((k) => k !== 0)).toEqual([0.5, 0.5]);
-	});
-});
-
-describe("growing", () => {
-	test("grows the wave it's made for as much as asked, fastest", () => {
-		const spacing = 8;
-		const kernel = growing(0.03, -0.02, spacing, 1.5);
-		const model = { kernel, spacing, jitter: 0, persistence: 0 };
-		expect(sum(kernel)).toBeCloseTo(1, 12);
-		expect(multiplier(model, 0.03, -0.02).growth).toBeCloseTo(1.5, 9);
-		expect(fastest(growth_map(model, 101))!.growth).toBeLessThan(1.5 + 0.02);
 	});
 });
 
