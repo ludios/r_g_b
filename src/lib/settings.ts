@@ -9,9 +9,10 @@ export type Param = "contrast" | "drift" | "spacing" | "jitter" | "persistence";
 export const PARAMS: readonly Param[] = ["contrast", "drift", "spacing", "jitter", "persistence"];
 
 /**
- * What the mouse can be given: a slider, or what r_g_b.html gave mouse Y, spacing and persistence
- * together, both exponential in the pointer's place: 0 at the top, 1/32 of the way at the middle,
- * all the way at the bottom, where persistence 1 freezes the image.
+ * What the mouse can be given: a slider, or what r_g_b.html gave it. That was contrast from 0.8 to
+ * 3.8 on mouse X, and on mouse Y spacing and persistence together, both exponential in the
+ * pointer's place: 0 at the top, 1/32 of the way at the middle, all the way at the bottom, where
+ * persistence 1 freezes the image.
  */
 export type MouseTarget = Param | "r_g_b";
 
@@ -102,8 +103,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	paint:       "#ffffff",
 };
 
-/** Settings that play like r_g_b.html: mouse X sets the contrast, mouse Y the spacing and persistence. */
-export const LIKE_R_G_B: Settings = { ...DEFAULT_SETTINGS, mouse_x: "contrast", mouse_y: "r_g_b" };
+/** Settings that play like r_g_b.html: the mouse sets contrast, spacing and persistence as it did. */
+export const LIKE_R_G_B: Settings = { ...DEFAULT_SETTINGS, mouse_x: "r_g_b", mouse_y: "r_g_b" };
 
 /** A slider: `positions` steps from `min` to `max`, evenly spaced or spaced by a constant ratio. */
 export interface Slider {
@@ -120,7 +121,7 @@ export const SLIDERS = {
 	contrast:    { min: 0,      max: 4,     scale: "linear", positions: 200 },
 	drift:       { min: -2,     max: 2,     scale: "linear", positions: 200 },
 	morph_steps: { min: 60,     max: 36000, scale: "log",    positions: 120, integer: true },
-	spacing:     { min: 1,      max: 256,   scale: "log",    positions: 240 },
+	spacing:     { min: 0.25,   max: 256,   scale: "log",    positions: 240 },
 	jitter:      { min: 0,      max: 0.25,  scale: "linear", positions: 100 },
 	persistence: { min: -1,     max: 1,     scale: "linear", positions: 400 },
 	speed:       { min: 1 / 32, max: 8,     scale: "log",    positions: 8 },

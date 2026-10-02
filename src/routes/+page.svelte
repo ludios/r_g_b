@@ -66,7 +66,9 @@
 	const shown   = $derived(shape(base));
 	const model   = $derived({ kernel: shown, spacing: settings.spacing, jitter: settings.jitter, persistence: settings.persistence });
 	let map_caption = $state("");
-	const encoded = $derived(encode(settings, name_of(source, base)));
+	/** How far the kernels' crossfade has gone, as reactive state, which sync() updates. */
+	let progress  = $state(0);
+	const encoded = $derived(encode(settings, name_of(source, base, !settings.morph && progress > 0)));
 	const PRESET_NAMES = Object.keys(PRESETS) as Preset[];
 
 	// Within NEAR px of the controls they're opaque; by FAR px away they've faded out.
@@ -115,9 +117,12 @@
 		return with_contrast(with_drift(kernel, settings.drift), settings.contrast);
 	}
 
-	/** The kernel as the URL names it. */
-	function name_of(from: Source, kernel: Kernel): KernelName {
-		return from.kind === "seed" ? from.seed : from.kind === "preset" ? from.name : kernel;
+	/**
+	 * The kernel as the URL names it.
+	 * @param frozen Whether a crossfade is held partway, so the kernel is no seed's but a blend.
+	 */
+	function name_of(from: Source, kernel: Kernel, frozen: boolean): KernelName {
+		return from.kind === "seed" && !frozen ? from.seed : from.kind === "preset" ? from.name : kernel;
 	}
 
 	/** When sync() last ran, in performance.now() milliseconds. */
@@ -130,6 +135,7 @@
 		synced_at = performance.now();
 		source  = kernels.source;
 		base    = kernels.kernel;
+		progress = kernels.progress;
 		next_in = Math.ceil((1 - kernels.progress) * settings.morph_steps);
 		if (source.kind === "seed") {
 			last_seed = source.seed;
@@ -296,7 +302,7 @@
 		settings = decoded.settings;
 		const named = decoded.kernel;
 		if (named === null) {
-			new_kernel();
+			jump(random_seed()); // Not new_kernel(): there's nothing to undo back to
 		} else if (typeof named === "number") {
 			jump(named);
 		} else if (typeof named === "string") {
@@ -305,8 +311,8 @@
 			kernels.edit(named);
 		}
 		sync();
+		// The restart effect starts it, now that the settings above changed.
 		sim = new Simulation(canvas);
-		restart();
 		// A lost WebGL context loses the buffers, so it restarts.
 		canvas.addEventListener("webglcontextrestored", () => restart());
 
@@ -325,7 +331,8 @@
 			frame++;
 			sim!.draw(settings.view);
 		}
-		loop();
+		// From the next frame, after the restart effect.
+		frame_request = requestAnimationFrame(loop);
 		return () => cancelAnimationFrame(frame_request);
 	});
 
@@ -397,17 +404,20 @@
 		const distance = Math.hypot(dx, dy);
 		opacity = 1 - Math.min(1, Math.max(0, (distance - NEAR) / (FAR - NEAR)));
 		if (distance > 0) {
-			follow(settings.mouse_x, event.clientX / window.innerWidth);
-			follow(settings.mouse_y, event.clientY / window.innerHeight);
+			follow(settings.mouse_x, event.clientX / window.innerWidth, "x");
+			follow(settings.mouse_y, event.clientY / window.innerHeight, "y");
 		}
 	}
 
 	/**
 	 * Moves what the mouse is given to the pointer's place across the window.
 	 * @param along 0 at the left or top, 1 at the right or bottom.
+	 * @param axis Which way `along` runs, for what r_g_b.html gave each.
 	 */
-	function follow(target: MouseTarget | null, along: number): void {
-		if (target === "r_g_b") {
+	function follow(target: MouseTarget | null, along: number, axis: "x" | "y"): void {
+		if (target === "r_g_b" && axis === "x") {
+			settings.contrast = Number((0.8 + 3 * along).toPrecision(4));
+		} else if (target === "r_g_b") {
 			// r_g_b.html's easeInExpo, and its spacing of up to a third of the height.
 			const e = along === 0 ? 0 : Math.pow(2, 10 * along - 10);
 			const spacing = (e * window.innerHeight) / settings.pixel / 3;
@@ -454,7 +464,7 @@
 		return speed >= 1 ? `${speed} per frame` : `1 per ${Math.round(1 / speed)} frames`;
 	}
 
-	const MOUSE_LABELS:  Record<MouseTarget, string> = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence", r_g_b: "Spacing + persistence" };
+	const MOUSE_LABELS:  Record<MouseTarget, string> = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence", r_g_b: "As r_g_b.html" };
 	const CLICK_LABELS:  Record<Click, string>  = { kernel: "New kernel", paint: "Paint", erase: "Erase", taps: "Show taps" };
 	const PRESET_LABELS: Record<Preset, string> = {
 		identity: "Identity", box: "Box blur", shift: "Shift", lean: "Lean", skip: "Every other tap",
@@ -480,7 +490,8 @@
 
 <svelte:window onpointermove={on_pointer_move} onmouseout={on_mouse_out} onkeydown={on_key} onresize={() => restart()} />
 
-<canvas bind:this={canvas} onclick={on_canvas_click} onpointerdown={on_canvas_down} onpointermove={on_canvas_move} onpointerup={() => (stroke = null)}
+<canvas bind:this={canvas} onclick={on_canvas_click} onpointerdown={on_canvas_down} onpointermove={on_canvas_move}
+	onpointerup={() => (stroke = null)} onpointercancel={() => (stroke = null)} onlostpointercapture={() => (stroke = null)}
 	style:width="{width * settings.pixel}px" style:height="{height * settings.pixel}px"></canvas>
 
 {#if settings.click === "taps" && taps_at !== null}
