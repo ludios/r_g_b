@@ -61,6 +61,7 @@
 </script>
 
 <figure>
+	<div class="title">Hinton diagram</div>
 	<svg viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} role="img" aria-label="The kernel's 25 weights"
 		onpointermove={move} onpointerup={end} onpointercancel={end} onpointerleave={() => drag === null && (active = null)}>
 		{#each { length: TAPS } as _, i (i)}
@@ -112,6 +113,14 @@
 		fill: none;
 		stroke: var(--text);
 		stroke-width: 1.5;
+	}
+	.title {
+		font-size: 10px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		white-space: nowrap;
+		margin-bottom: 2px;
 	}
 	figcaption {
 		font-size: 11px;

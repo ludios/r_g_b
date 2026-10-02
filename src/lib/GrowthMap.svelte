@@ -124,11 +124,10 @@
 		return a.map((v, i) => Math.round(v + (b[i]! - v) * t));
 	}
 
-	/** The index of the point under the pointer. */
-	function at(event: PointerEvent): number {
-		const box    = canvas.getBoundingClientRect();
-		const column = Math.round(((event.clientX - box.left) / box.width) * SIZE - 0.5);
-		const row    = Math.round(((event.clientY - box.top) / box.height) * SIZE - 0.5);
+	/** The index of the point under the pointer: offsetX and offsetY are inside the border. */
+	function at(event: MouseEvent): number {
+		const column = Math.floor((event.offsetX / canvas.clientWidth) * SIZE);
+		const row    = Math.floor((event.offsetY / canvas.clientHeight) * SIZE);
 		return Math.min(SIZE - 1, Math.max(0, row)) * SIZE + Math.min(SIZE - 1, Math.max(0, column));
 	}
 
@@ -149,7 +148,7 @@
 			: "";
 	});
 
-	function plant(event: PointerEvent): void {
+	function plant(event: MouseEvent): void {
 		if (map === null) {
 			return;
 		}
@@ -160,13 +159,36 @@
 	}
 </script>
 
-<canvas bind:this={canvas} width={SIZE} height={SIZE} aria-label="Which stripes grow"
-	onpointermove={(e) => (pointed = at(e))} onpointerleave={() => (pointed = null)} onpointerup={plant}></canvas>
+<figure>
+	<div class="title">Frequency response</div>
+	<canvas bind:this={canvas} width={SIZE} height={SIZE} aria-label="Frequency response: which stripes grow"
+		onpointermove={(e) => (pointed = at(e))} onpointerleave={() => (pointed = null)} onclick={plant}></canvas>
+	<figcaption>Middle: flat; edge: fine stripes.<br />Shaded: grows; hatched: inverts.</figcaption>
+</figure>
 
 <style>
-	/* color, background-color, caret-color and outline-color carry the palette to draw(). */
+	figure {
+		margin: 0;
+	}
+	.title {
+		font-size: 10px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		white-space: nowrap;
+		margin-bottom: 2px;
+	}
+	figcaption {
+		font-size: 11px;
+		line-height: 1.4;
+		color: var(--text-muted);
+		white-space: nowrap;
+	}
+	/* One point a pixel, inside the 1 px border. color, background-color, caret-color and
+	   outline-color carry the palette to draw(). */
 	canvas {
 		display: block;
+		box-sizing: content-box;
 		width: 175px;
 		height: 175px;
 		color: var(--accent);
