@@ -195,6 +195,7 @@
 		margin: 0;
 	}
 	.title {
+		text-align: center;
 		font-size: 10px;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
