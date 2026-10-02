@@ -2,6 +2,7 @@
 // Model-output: Claude Opus 5.5
 
 import { getLogger } from "@logtape/logtape";
+import { A } from "ayy";
 import { browser } from "$app/environment";
 
 const log = getLogger(["r_g_b", "storage"]);
@@ -32,10 +33,19 @@ export function read_stored(storage: Storage | null, key: string): unknown {
 	}
 }
 
-/** Keeps `value` as JSON under `key` in `storage`; if the browser won't, it lasts only as long as the page. */
+/**
+ * Keeps `value` as JSON under `key` in `storage`, or for `undefined`, forgets what's there. If the
+ * browser refuses, that's logged and the write dropped.
+ */
 export function write_stored(storage: Storage | null, key: string, value: unknown): void {
+	const json = value === undefined ? null : JSON.stringify(value);
+	A.neq(typeof json, "undefined"); // A function, say, which has no JSON
 	try {
-		storage?.setItem(key, JSON.stringify(value));
+		if (json === null) {
+			storage?.removeItem(key);
+		} else {
+			storage?.setItem(key, json);
+		}
 	} catch (error) {
 		log.warn("could not keep {key}: {error}", { key, error });
 	}

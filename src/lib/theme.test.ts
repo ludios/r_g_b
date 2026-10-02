@@ -1,21 +1,7 @@
 // Model-output: Claude Fable 5.1
 import { expect, test } from "vitest";
+import { fake_storage } from "./fake_storage";
 import { STORAGE_KEY, ThemeChoice, parse_theme } from "./theme.svelte";
-
-/** Just enough of the Storage interface for ThemeChoice. */
-function fake_storage(initial: Record<string, string> = {}): Storage {
-	const map = new Map(Object.entries(initial));
-	return {
-		getItem:    (k) => map.get(k) ?? null,
-		setItem:    (k, v) => void map.set(k, v),
-		removeItem: (k) => void map.delete(k),
-		clear:      () => map.clear(),
-		key:        (i) => [...map.keys()][i] ?? null,
-		get length() {
-			return map.size;
-		},
-	};
-}
 
 test("only an override is stored, and junk reads as system", () => {
 	expect(parse_theme(null)).toBe("system");

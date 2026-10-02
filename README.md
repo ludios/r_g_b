@@ -24,7 +24,8 @@ By default it plays as the original did: the mouse sets contrast, spacing and pe
 - `src/lib/settings.ts` — the settings and their sliders; `codec.ts` — them and the kernel as a URL.
 - `src/lib/KernelDiagram.svelte`, `GrowthMap.svelte`, `TapsOverlay.svelte` — the kernel's squares,
   the map, and where one pixel's taps land.
-- `src/lib/theme.svelte.ts`, `storage.ts` — the light/dark override, as in diamond-maker.
+- `src/lib/theme.svelte.ts` — the light/dark override, as in diamond-maker; `storage.ts` —
+  localStorage, and JSON kept in it for the open sections and Fade controls.
 - `src/routes/+page.svelte` — the canvas, the loop, and the card.
 - `test/snapshot.py` — deterministic screenshots of a revision, to check a refactor changes
   nothing.

@@ -24,8 +24,8 @@
 	let opacity    = $state(1);
 	/** Steps until the next kernel, while morphing. */
 	let next_in    = $state(0);
-	const theme    = new ThemeChoice(local_storage());
 	const storage  = local_storage();
+	const theme    = new ThemeChoice(storage);
 	const SECTIONS_KEY = "r_g_b-open-sections";
 	/** The card's sections, and whether each starts open. */
 	const SECTIONS = { how: false, presets: true, time: true, start: true, taps: true, kernel: true, pointer: true, view: true, ui: true };
@@ -43,10 +43,10 @@
 	$effect(() => write_stored(storage, SECTIONS_KEY, open));
 
 	const FADE_KEY = "r_g_b-fade";
-	/** Whether the controls fade as the pointer leaves them, kept in localStorage; yes unless turned off. */
+	/** Whether the controls fade as the pointer leaves them: yes, unless turned off, which localStorage keeps. */
 	let fade = $state(read_stored(storage, FADE_KEY) !== false);
 
-	$effect(() => write_stored(storage, FADE_KEY, fade));
+	$effect(() => write_stored(storage, FADE_KEY, fade ? undefined : false));
 
 	let canvas: HTMLCanvasElement;
 	let chrome: HTMLElement;
@@ -789,12 +789,10 @@
 							{/each}
 						</select>
 					</label>
-					<div class="row">
+					<label class="row">
 						<span>Fade controls</span>
-						<div class="choices">
-							<label><input type="checkbox" bind:checked={fade} /> when the pointer is away</label>
-						</div>
-					</div>
+						<span class="check"><input type="checkbox" bind:checked={fade} /> when the pointer is away</span>
+					</label>
 				</details>
 			</form>
 		</section>
