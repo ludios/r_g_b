@@ -71,7 +71,8 @@
 
 	/** A weight to three places, where one too small to show is 0, not -0. */
 	function format(weight: number): string {
-		return (Math.abs(weight) < 0.0005 ? 0 : weight).toFixed(3);
+		const text = weight.toFixed(3);
+		return text === "-0.000" ? "0.000" : text;
 	}
 
 	/**
