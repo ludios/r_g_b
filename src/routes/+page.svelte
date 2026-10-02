@@ -745,7 +745,7 @@
 						</div>
 					</div>
 					{#if mouse_frozen(settings.mouse_x, "x") || mouse_frozen(settings.mouse_y, "y")}
-						<p class="muted">The mouse leaves Contrast and Drift alone while the kernel is a preset or edited.</p>
+						<p class="muted">Contrast & Drift are left alone for preset or edited kernels.</p>
 					{/if}
 					<div class="row">
 						<span>Click</span>
