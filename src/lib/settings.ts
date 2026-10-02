@@ -87,6 +87,7 @@ export interface Settings {
 	paint: string;
 }
 
+/** Settings that play like r_g_b.html: the mouse sets contrast, spacing and persistence as it did. */
 export const DEFAULT_SETTINGS: Settings = {
 	contrast:    2.3,
 	drift:       1,
@@ -103,15 +104,12 @@ export const DEFAULT_SETTINGS: Settings = {
 	pixel:       1,
 	precision:   8,
 	view:        "color",
-	mouse_x:     null,
-	mouse_y:     null,
+	mouse_x:     "r_g_b",
+	mouse_y:     "r_g_b",
 	click:       "kernel",
 	brush:       6,
 	paint:       "#ffffff",
 };
-
-/** Settings that play like r_g_b.html: the mouse sets contrast, spacing and persistence as it did. */
-export const LIKE_R_G_B: Settings = { ...DEFAULT_SETTINGS, mouse_x: "r_g_b", mouse_y: "r_g_b" };
 
 /** A slider: `positions` steps from `min` to `max`, evenly spaced or spaced by a constant ratio. */
 export interface Slider {

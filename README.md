@@ -10,7 +10,7 @@ A card in the corner holds the controls: the kernel (random by number, morphing 
 presets; dragged by hand), contrast, drift, tap spacing, jitter, persistence, speed, what a restart
 starts from, how the image is shown, and what the mouse and clicks do. A map shows which stripes
 the kernel grows. Everything that sets the look is in the address bar, so a URL is a recipe.
-"Like r_g_b.html" plays as the original did, with the mouse.
+By default it plays as the original did: the mouse sets contrast, spacing and persistence.
 
 ## Layout
 

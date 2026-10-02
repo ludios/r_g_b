@@ -9,7 +9,7 @@
 	import TapsOverlay from "$lib/TapsOverlay.svelte";
 	import { type KernelName, decode, encode } from "$lib/codec";
 	import { BALANCES, type Balance, GROUPS, type Group, type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, TRANSFORMS, type Transform, group_of, mutated, next_seed, with_contrast, with_delta, with_drift } from "$lib/kernel";
-	import { CLICKS, type Click, DEFAULT_SETTINGS, LIKE_R_G_B, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, PRECISIONS, type Precision, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
+	import { CLICKS, type Click, DEFAULT_SETTINGS, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, PRECISIONS, type Precision, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { growing } from "$lib/spectrum";
 	import { local_storage } from "$lib/storage";
@@ -352,12 +352,9 @@
 		settings[key] = value_at(SLIDERS[key], event.currentTarget.valueAsNumber);
 	}
 
-	/** Puts the settings back to some set of them; the kernel stays, but a preset or edit goes back to random for r_g_b.html. */
+	/** Puts the settings back to some set of them; the kernel stays. */
 	function reset(to: Settings): void {
 		settings = { ...to };
-		if (to === LIKE_R_G_B && source.kind !== "seed") {
-			jump(last_seed ?? random_seed());
-		}
 	}
 
 	/** Where the screen pixel at `x`, `y` from the top left is in the simulation, from the bottom left. */
@@ -752,7 +749,6 @@
 
 			<footer class="actions">
 				<button type="button" onclick={() => reset(DEFAULT_SETTINGS)}>Reset settings</button>
-				<button type="button" onclick={() => reset(LIKE_R_G_B)}>Like r_g_b.html</button>
 				<label class="theme">
 					<span>Theme</span>
 					<select value={theme.theme} onchange={(e) => theme.set(parse_theme(e.currentTarget.value))}>
