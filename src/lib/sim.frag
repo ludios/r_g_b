@@ -5,6 +5,7 @@ uniform sampler2D prev_frame;
 uniform sampler2D seeds;      // The seed-dot canvas
 uniform float kernel[25];     // Row-major 5x5 weights, summing to 1
 uniform float tap_spacing;    // In pixels
+uniform float jitter;         // Each pixel scales its tap spacing by 1 +/- up to this
 uniform float persistence;    // How much of the previous frame to keep
 
 // noise from http://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
@@ -32,9 +33,9 @@ float random(vec2 v) {
 void main() {
 	vec2 uv = gl_FragCoord.xy / res;
 
-	// Static per-pixel +/-5% jitter on the tap spacing (uv is the same every frame). It speckles
-	// stripe edges, over a band that widens with the spacing.
-	vec2 tap = tap_spacing * vec2(random(uv) * 0.1 + 0.95);
+	// Static per-pixel jitter on the tap spacing (uv is the same every frame). It speckles stripe
+	// edges, over a band that widens with the spacing.
+	vec2 tap = tap_spacing * vec2(1.0 + jitter * (2.0 * random(uv) - 1.0));
 	// Each tap reads the whole texel it lands in: pixel centers are at half-integers, so the
 	// floor rounds the offset to the nearest whole pixel. Wrapping makes the screen a torus:
 	// patterns wrap across edges.

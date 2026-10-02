@@ -17,8 +17,6 @@ export const TAPS = 25;
 /** The weight of every tap of a flat kernel, which blurs evenly. */
 export const FLAT = 1 / TAPS;
 
-const FADE_MS = 60 * 1000;
-
 /** A standard normal deviate, by Box-Muller. */
 function random_normal(random: () => number): number {
 	const u = 1 - random(); // (0, 1], so the log is finite
@@ -78,41 +76,52 @@ function ease_in_out_sine(x: number): number {
 }
 
 /**
- * The kernel drifting through random kernels: each crossfades into the next over a minute of
- * real time, which passes while the simulation is paused too.
+ * The kernel morphing through random kernels one simulation step at a time, so pausing holds it:
+ * each crossfades into the next, easing in and out.
  */
-export class KernelDrift {
-	#from: Kernel = [];
-	#to: Kernel = [];
-	/** When the current crossfade began, in performance.now() milliseconds. */
-	#start = 0;
+export class KernelMorph {
+	#from: Kernel;
+	#to: Kernel;
+	/** How far the crossfade has gone, from 0 up to 1. */
+	#progress = 0;
 
 	/** @param random Uniform on [0, 1), like Math.random. */
-	constructor(private random: () => number) {}
-
-	/** Jumps to a random kernel, fading toward another. */
-	jump(now: number): void {
-		this.#fade(this.#generate(), now);
+	constructor(private random: () => number) {
+		this.#from = this.#generate();
+		this.#to = this.#generate();
 	}
 
-	/** Starts the next crossfade if this one is over; the next starts at the first call after. */
-	advance(now: number): void {
-		if (now - this.#start >= FADE_MS) {
-			this.#fade(this.#to, now);
-		}
+	/** How far the crossfade has gone, from 0 up to 1. */
+	get progress(): number {
+		return this.#progress;
 	}
 
-	/** The crossfaded kernel at `now`. */
-	kernel(now: number): Kernel {
-		A.eq(this.#from.length, TAPS);
-		const t = ease_in_out_sine((now - this.#start) / FADE_MS);
+	/** The crossfaded kernel. */
+	get kernel(): Kernel {
+		const t = ease_in_out_sine(this.#progress);
 		return this.#to.map((k, i) => k * t + this.#from[i]! * (1 - t));
 	}
 
-	#fade(from: Kernel, now: number): void {
-		this.#from = from;
+	/** Jumps to a random kernel, fading toward another. */
+	jump(): void {
+		this.#from = this.#generate();
 		this.#to = this.#generate();
-		this.#start = now;
+		this.#progress = 0;
+	}
+
+	/**
+	 * Moves the crossfade on by one step; once it's done, the next begins.
+	 * @param steps How many steps a whole crossfade takes, at this rate.
+	 */
+	advance(steps: number): void {
+		A.gte(steps, 1);
+		this.#progress += 1 / steps;
+		// Ten tenths add up to just under 1.
+		if (this.#progress > 1 - 1e-9) {
+			this.#from = this.#to;
+			this.#to = this.#generate();
+			this.#progress = 0;
+		}
 	}
 
 	#generate(): Kernel {

@@ -1,7 +1,7 @@
 // Model-output: Claude Opus 5.5
 import { array, assert, double, property } from "fast-check";
 import { describe, expect, test } from "vitest";
-import { FLAT, KernelDrift, TAPS, gen_kernel, with_contrast } from "./kernel";
+import { FLAT, KernelMorph, TAPS, gen_kernel, with_contrast } from "./kernel";
 
 /** Uniform draws in [0, 1), as many as a kernel takes: two per tap and one for the smoothing. */
 const draws = array(double({ min: 0, max: 1, maxExcluded: true, noNaN: true }), { minLength: 2 * TAPS + 1, maxLength: 2 * TAPS + 1 });
@@ -48,17 +48,24 @@ describe("with_contrast", () => {
 	});
 });
 
-describe("KernelDrift", () => {
-	test("starts at one kernel, ends a minute later at the next, and moves on from there", () => {
-		const drift = new KernelDrift(Math.random);
-		drift.jump(1000);
-		const first = drift.kernel(1000);
-		const second = drift.kernel(61_000);
-		expect(second).not.toEqual(first);
-		expect(sum(drift.kernel(31_000))).toBeCloseTo(1, 12);
-
-		drift.advance(61_000);
-		expect(drift.kernel(61_000)).toEqual(second);
-		expect(drift.kernel(121_000)).not.toEqual(second);
+describe("KernelMorph", () => {
+	test("starts at one kernel, ends at the next after the given steps, and moves on from there", () => {
+		const morph = new KernelMorph(Math.random);
+		const first = morph.kernel;
+		for (let i = 0; i < 5; i++) {
+			morph.advance(10);
+		}
+		expect(morph.progress).toBeCloseTo(0.5, 12);
+		expect(sum(morph.kernel)).toBeCloseTo(1, 12);
+		expect(morph.kernel).not.toEqual(first);
+		for (let i = 0; i < 5; i++) {
+			morph.advance(10);
+		}
+		expect(morph.progress).toBe(0);
+		const second = morph.kernel;
+		morph.advance(2);
+		expect(morph.kernel).not.toEqual(second);
+		morph.jump();
+		expect(morph.progress).toBe(0);
 	});
 });

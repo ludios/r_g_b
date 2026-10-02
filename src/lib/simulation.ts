@@ -5,14 +5,13 @@ import * as THREE from "three";
 import type { Kernel } from "./kernel";
 import sim_shader from "./sim.frag?raw";
 
-/** Fresh buffers' color. On black, a red dot would grow red/black stripes; on gray it dips G and B too. */
-const GRAY = 0.05;
-
 /** What one step of the simulation does, besides convolving with the kernel. */
 export interface StepSettings {
 	kernel: Kernel;
 	/** The distance between neighboring taps, in buffer pixels. */
 	tap_spacing: number;
+	/** How far each pixel's tap spacing is scaled from 1, at most. */
+	jitter: number;
 	/** How much of the previous frame to keep, 0 to 1. */
 	persistence: number;
 }
@@ -53,6 +52,7 @@ export class Simulation {
 		seeds:       { value: null as THREE.Texture | null },
 		kernel:      { value: [] as number[] },
 		tap_spacing: { value: 0 },
+		jitter:      { value: 0 },
 		persistence: { value: 0 },
 	};
 	#screen_material = new THREE.MeshBasicMaterial();
@@ -90,8 +90,9 @@ export class Simulation {
 	 * (Re)starts the simulation from just the seeds; the canvas's own size is left to CSS.
 	 * @param width The buffers' width in pixels.
 	 * @param height The buffers' height in pixels.
+	 * @param ground The gray the buffers start as, 0 to 1.
 	 */
-	restart(width: number, height: number): void {
+	restart(width: number, height: number, ground: number): void {
 		this.renderer.setSize(width, height, false);
 
 		const seed_canvas = document.createElement("canvas");
@@ -108,25 +109,29 @@ export class Simulation {
 		this.#current.setSize(width, height);
 		this.#next.setSize(width, height);
 		this.renderer.setRenderTarget(this.#current);
-		this.renderer.setClearColor(new THREE.Color(GRAY, GRAY, GRAY));
+		this.renderer.setClearColor(new THREE.Color(ground, ground, ground));
 		this.renderer.clear();
 
 		this.#sim_uniforms.res.value.set(width, height);
 		this.#sim_uniforms.seeds.value = this.#seed_texture;
 	}
 
-	/** Runs one step of the simulation and shows the result. */
+	/** Runs one step of the simulation. */
 	step(settings: StepSettings): void {
 		const u = this.#sim_uniforms;
 		u.prev_frame.value = this.#current.texture;
 		u.kernel.value = settings.kernel;
 		u.tap_spacing.value = settings.tap_spacing;
+		u.jitter.value = settings.jitter;
 		u.persistence.value = settings.persistence;
 
 		this.renderer.setRenderTarget(this.#next);
 		this.renderer.render(this.#sim_scene, this.#camera);
 		[this.#current, this.#next] = [this.#next, this.#current];
+	}
 
+	/** Shows the latest frame on the canvas. */
+	draw(): void {
 		this.#screen_material.map = this.#current.texture;
 		this.renderer.setRenderTarget(null);
 		this.renderer.render(this.#screen_scene, this.#camera);
