@@ -64,8 +64,15 @@ button {
 	cursor: pointer;
 }
 
-button:hover {
+button:hover:not(:disabled) {
 	border-color: var(--text);
+}
+
+/* The rules above override the browser's greying of a disabled button, so it's dimmed here, as a
+   disabled slider is. */
+button:disabled {
+	opacity: 0.4;
+	cursor: default;
 }
 
 a {
