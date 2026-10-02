@@ -733,7 +733,7 @@
 				<details class="section" bind:open={open.pointer}>
 					<summary>Pointer</summary>
 					<div class="row">
-						<span>Mouse</span>
+						<span>Position changes</span>
 						<div class="choices halves">
 							{#each [["X", "mouse_x"], ["Y", "mouse_y"]] as const as [axis, key] (key)}
 								<label>{axis} <select bind:value={settings[key]}>
