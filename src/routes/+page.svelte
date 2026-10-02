@@ -543,7 +543,7 @@
 				<summary>How it works (slop)</summary>
 				<div class="prose">
 					<h3>How the image changes</h3>
-					<p>The image filters itself over and over. Each step uses the previous image to make the next.</p>
+					<p>The image filters itself over and over. Each step uses the previous image to make the next, stored at the selected <strong>Bit depth</strong>.</p>
 					<p>For each pixel, the filter reads 25 samples in a 5×5 grid centered on that pixel, multiplies each by a weight, and adds the results. Each sample position is called a <strong>tap</strong>. The 25 taps and their weights make up the <strong>kernel</strong>.</p>
 					<p><strong>Persistence</strong> mixes the result with the pixel’s old value. A negative setting makes the change larger instead. Each color channel is then clipped to the range 0–1. If stamping is on, the seeds are painted back over the result.</p>
 					<h3>Starting a pattern</h3>
@@ -552,8 +552,8 @@
 					<p>With <strong>Stamped every step</strong> on, the seeds are redrawn after each step. They stay put and keep feeding the pattern around them. With it off, they are drawn only at the start, then change like any other pixels.</p>
 					<p>Red, green and blue are processed separately. Against a dark-gray background, a red dot raises the red channel but lowers green and blue. That starts the channels in opposition: red against cyan.</p>
 					<h3>Editing the kernel</h3>
-					<p>The <strong>Hinton Diagram</strong> shows the 25 weights. Hollow squares are negative, and bronze ones are greater than 1 or less than −1.</p>
-					<p>Drag a square or type a value to change a weight. The middle one, outlined with dashes, adjusts to keep the total at 1, preserving flat colors.</p>
+					<p>The <strong>Hinton Diagram</strong> shows the weights. Hollow squares are negative, and bronze ones are greater than 1 or less than −1.</p>
+					<p>Drag a square or type a value to change a weight. The middle one adjusts itself to keep the total at 1.</p>
 					<p>The taps’ offsets from the pixel run from −2 to 2 on each axis, multiplied by <strong>Spacing</strong>, with the resulting positions rounded to whole pixels. Because the filter reads only at these positions, fine stripes can look like wider ones to it. This is why the Frequency Response map roughly repeats.</p>
 					<p><strong>Jitter</strong> gives each pixel a different spacing, fixed over time. This blurs the repeats and tends to favor the widest stripes.</p>
 					<p><strong>Contrast</strong> scales each weight’s difference from 1/25. That is the weight every tap would have in an equal average.</p>
@@ -564,10 +564,6 @@
 					<p>Shaded areas have a multiplier above 1, so those stripes grow. Circles mark the fastest growth.</p>
 					<p>A step can also shift stripes. A shift of half a cycle swaps bright and dark. Hatched areas are close to that shift, so those patterns strobe.</p>
 					<p>Click anywhere on the map to restart the image with the corresponding stripes.</p>
-					<h3>Bit Depth</h3>
-					<p>Each step’s result is stored at the selected <strong>Bit depth</strong>.</p>
-					<p>At <strong>8-bit</strong>, each color channel has 256 possible levels. A change smaller than half a level rounds away. As a blur spreads, its changes get smaller until they can no longer be stored. The blur stops, leaving a soft trace of what it blurred.</p>
-					<p><strong>16-bit</strong> and <strong>32-bit</strong> floats retain much smaller changes, so a blur gets flatter before it stops. At 32-bit, the remaining trace is too faint to see. Higher precision uses more memory and takes more time per step.</p>
 					<h3>Keyboard controls</h3>
 					<p>When no field, button, menu, link or section title has focus, <strong>Space</strong> pauses or plays, and <strong>Enter</strong> advances one step while paused. <strong>Z</strong> undoes a change to the kernel; <strong>Shift+Z</strong> redoes it.</p>
 					<p>In the Hinton Diagram, use the arrow keys to select a tap. Type a weight and press <strong>Enter</strong> to set it.</p>
