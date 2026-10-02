@@ -29,7 +29,7 @@
 	const storage  = local_storage();
 	const SECTIONS_KEY = "r_g_b-open-sections";
 	/** The card's sections, and whether each starts open. */
-	const SECTIONS = { how: false, time: true, start: true, taps: true, kernel: true, pointer: true, view: true };
+	const SECTIONS = { how: false, presets: true, time: true, start: true, taps: true, kernel: true, pointer: true, view: true };
 	type Section = keyof typeof SECTIONS;
 	/** Which of the card's sections are open, kept in localStorage. */
 	let open = $state(read_open());
@@ -553,15 +553,15 @@
 				</div>
 			</details>
 
-			<div class="row">
-				<span>Presets</span>
+			<details class="section" bind:open={open.presets}>
+				<summary>Presets</summary>
 				<div class="choices presets">
 					<button type="button" onclick={reset}>r_g_b.html</button>
 					{#each SETTINGS_PRESET_NAMES as preset (preset)}
 						<button type="button" onclick={() => apply(preset)}>{SETTINGS_PRESET_LABELS[preset]}</button>
 					{/each}
 				</div>
-			</div>
+			</details>
 
 			<form novalidate onsubmit={(e) => e.preventDefault()}>
 				<details class="section" bind:open={open.time}>
