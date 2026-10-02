@@ -168,7 +168,9 @@ export class Simulation {
 		const fx = Math.round((start.wave?.fx ?? 0) * width) / width;
 		const fy = Math.round((start.wave?.fy ?? 0) * height) / height;
 		u.wave.value.set(fx, fy, start.wave === undefined ? 0 : WAVE);
-		// Both buffers, so that the first step's change is from the start.
+		// Both buffers, so that the first step's change is from the start. Nothing is read, but the
+		// last frame's texture must not stay bound while it's drawn into: a feedback loop to WebGL.
+		u.prev_frame.value = null;
 		u.starting.value = true;
 		for (const target of [this.#current, this.#next]) {
 			this.renderer.setRenderTarget(target);

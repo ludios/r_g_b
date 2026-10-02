@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Model-output: Claude Opus 5.5
 """Deterministic screenshots of the page, for checking that a refactor doesn't change the output.
 
     test/snapshot.py SOURCE OUTDIR [--frames N]

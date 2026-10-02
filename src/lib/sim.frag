@@ -1,3 +1,5 @@
+// Model-output: Claude Opus 5.5
+//
 // One simulation step, a fresh start, or a brush stroke. Needs WebGL2 (uint, floatBitsToUint); three.js's
 // WebGL2 prefix #defines gl_FragColor. Alpha records which channels the clamp changed, as bits
 // R=1, G=2, B=4 over 255.
@@ -53,6 +55,8 @@ vec3 step_from_previous(vec2 uv) {
 	for (int y = -2; y <= 2; y++) {
 		for (int x = -2; x <= 2; x++) {
 			vec2 texel = mod(floor(gl_FragCoord.xy + tap * vec2(x, y)), res);
+			// Where division is approximate, mod(res, res) can come out as res.
+			texel -= res * step(res, texel);
 			sum += texelFetch(prev_frame, ivec2(texel), 0) * kernel[(y + 2) * 5 + (x + 2)];
 		}
 	}

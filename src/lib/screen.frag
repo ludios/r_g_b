@@ -3,7 +3,7 @@
 // Shows the latest frame on the canvas, whose pixels are the buffers' pixels, one way or another.
 uniform sampler2D current;
 uniform sampler2D previous;   // The frame before
-uniform int view;             // An index into simulation.ts's VIEWS
+uniform int view;             // An index into settings.ts's VIEWS
 
 void main() {
 	ivec2 p = ivec2(gl_FragCoord.xy);
