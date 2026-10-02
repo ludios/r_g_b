@@ -940,14 +940,10 @@
 		gap: 4px 12px;
 	}
 	/* Choices that share their line in halves, whatever their longest option; a select too long for
-	   its half is cut off until it's opened. They wrap only when a half couldn't show a short one. */
+	   its half is cut off until it's opened. 8.5em fits "X r_g_b.html", so below that they wrap. */
 	.halves > label {
 		flex: 1 1 0;
 		min-width: 8.5em;
-	}
-	.halves select {
-		flex: 1;
-		min-width: 0;
 	}
 	/* A line of choices of its own sits as far from the title and its neighbors as a row does,
 	   which is as far as a wrapped line. */
@@ -974,7 +970,8 @@
 		display: flex;
 		gap: 6px;
 	}
-	.pick select {
+	/* A select that fills its share of the line, even one narrower than its longest option. */
+	.pick select, .halves select {
 		flex: 1;
 		min-width: 0;
 	}
