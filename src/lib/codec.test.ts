@@ -2,7 +2,7 @@
 import { assert, boolean, constantFrom, double, integer, property, record, stringMatching } from "fast-check";
 import { describe, expect, test } from "vitest";
 import { decode, encode } from "./codec";
-import { MAX_SEED, PRESETS, with_weight } from "./kernel";
+import { MAX_SEED, PRESETS, with_delta } from "./kernel";
 import { CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, PIXEL_SIZES, SEEDS, SLIDERS, VIEWS } from "./settings";
 
 // Adding 0 makes -0 a plain 0, which is what the URL can say.
@@ -39,7 +39,7 @@ describe("codec", () => {
 
 	test("reads back presets, and weights with the sum put back at 1", () => {
 		expect(decode(encode(DEFAULT_SETTINGS, "ring")).kernel).toBe("ring");
-		const weights = with_weight(PRESETS.ring, 3, 1 / 3);
+		const weights = with_delta(PRESETS.ring, [3], 1 / 3, "others");
 		const decoded = decode(encode(DEFAULT_SETTINGS, weights)).kernel as number[];
 		decoded.forEach((k, i) => expect(k).toBeCloseTo(weights[i]!, 5));
 		expect(decoded.reduce((s, k) => s + k, 0)).toBeCloseTo(1, 14);

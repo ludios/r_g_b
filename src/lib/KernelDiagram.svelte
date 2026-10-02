@@ -2,23 +2,28 @@
 <script lang="ts">
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
 	// screen, whose area is the weight's size, filled if positive and hollow if negative. Dragging
-	// a square up or down changes its weight.
-	import { type Kernel, TAPS } from "./kernel";
+	// a square up or down changes its weight; the taps that move with it are outlined.
+	import { type Group, type Kernel, TAPS, group_of } from "./kernel";
 
 	interface Props {
 		kernel: Kernel;
+		/** Which taps a drag moves together. */
+		group: Group;
+		/** Called as a drag begins. */
+		onstart: () => void;
 		/** Called with a tap's index and its new weight as it's dragged. */
 		onedit: (index: number, weight: number) => void;
 	}
 
-	let { kernel, onedit }: Props = $props();
+	let { kernel, group, onstart, onedit }: Props = $props();
 
 	const CELL = 22;
 	/** How much a weight changes per pixel of drag. */
 	const PER_PX = 0.005;
 
-	/** The tap being dragged or pointed at, if any. */
+	/** The tap being dragged or pointed at, if any, and those that move with it. */
 	let active  = $state<number | null>(null);
+	const linked = $derived(active === null ? [] : group_of(active, group));
 	let drag: { index: number; y: number; weight: number } | null = null;
 
 	/** The top left of tap `i`'s cell: row 0 of a kernel is the bottom row. */
@@ -36,6 +41,7 @@
 		(event.currentTarget as Element).closest("svg")!.setPointerCapture(event.pointerId);
 		drag = { index, y: event.clientY, weight: kernel[index]! };
 		active = index;
+		onstart();
 	}
 
 	function move(event: PointerEvent): void {
@@ -62,7 +68,7 @@
 			{@const w = kernel[i]!}
 			{@const s = side(w)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<g class="tap" class:middle={i === 12} onpointerdown={(e) => start(e, i)} onpointerenter={() => drag === null && (active = i)}>
+			<g class="tap" class:middle={i === 12} class:linked={linked.includes(i)} onpointerdown={(e) => start(e, i)} onpointerenter={() => drag === null && (active = i)}>
 				<rect class="cell" x={x} y={y} width={CELL} height={CELL} />
 				<rect class="weight" class:negative={w < 0} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
 			</g>
@@ -95,6 +101,9 @@
 	}
 	.middle .cell {
 		stroke: var(--accent);
+	}
+	.linked .cell {
+		stroke: var(--text);
 	}
 	.weight {
 		fill: var(--text);

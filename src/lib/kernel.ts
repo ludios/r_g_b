@@ -34,15 +34,29 @@ export const PRESETS = {
 	box:      kernel_of(() => FLAT),
 	/** Every pixel takes the value one tap to its right, so the image moves left. */
 	shift:    kernel_of((x, y) => Number(x === 1 && y === 0)),
+	/** A shift blurred: half a tap left a step, fading as it goes. */
+	lean:     kernel_of((x, y) => (y === 0 ? ({ [-1]: 0.25, 1: 0.75 } as Record<number, number>)[x] ?? 0 : 0)),
+	/** A blur over taps two apart, so pixels split into lattices that never mix, but for jitter. */
+	skip:     kernel_of((x, y) => (x === 0 && y === 0 ? 0.5 : (x === 0 || y === 0) && Math.abs(x + y) === 2 ? 0.125 : 0)),
 	/** Only the middle row: stripes 6 taps apart grow along it; up and down, nothing is chosen. */
 	row:      kernel_of((x, y) => (y === 0 ? [-0.25, 0.5, 0.5, 0.5, -0.25][x + 2]! : 0)),
+	/** Blurs across, sharpens up and down: bands 2 taps tall double every step. */
+	saddle:   kernel_of((x, y) => (x === 0 && y === 0 ? 1 : y === 0 && Math.abs(x) === 1 ? 0.25 : x === 0 && Math.abs(y) === 1 ? -0.25 : 0)),
 	/** Positive middle, negative edge: stripes about 4.5 taps apart grow, at any angle. */
 	ring:     kernel_of((x, y) => ({ 0: 0.76, 1: 0.35, 2: 0.12, 4: -0.075, 5: -0.11, 8: -0.115 })[x * x + y * y] ?? 0),
-	/** Negative middle, positive neighbors: a checkerboard of taps doubles and inverts every step. */
+	/** The row and its quarter turn, halved: two diagonal stripes cross, and the clamp makes dots. */
+	dots:     kernel_of((x, y) => (x !== 0 && y !== 0 ? 0 : x === 0 && y === 0 ? 0.5 : Math.abs(x + y) === 1 ? 0.25 : -0.125)),
+	/** Strong middle, negative neighbors: the finest checkerboard doubles every step. */
+	sharpen:  kernel_of((x, y) => (x === 0 && y === 0 ? 1.5 : Math.abs(x) + Math.abs(y) === 1 ? -0.125 : 0)),
+	/** Negative middle, positive neighbors: the checkerboard doubles and inverts every step. */
 	checker:  kernel_of((x, y) => (x === 0 && y === 0 ? -0.5 : Math.abs(x) + Math.abs(y) === 1 ? 0.375 : 0)),
+	/** Identity plus a lopsided pair: stripes 4 taps apart grow as they slide. Drift 0 is the identity. */
+	advect:   kernel_of((x, y) => (y === 0 ? ({ [-1]: -0.5, 0: 1, 1: 0.5 } as Record<number, number>)[x] ?? 0 : 0)),
 } satisfies Record<string, Kernel>;
 
 export type Preset = keyof typeof PRESETS;
+
+
 
 /** A standard normal deviate, by Box-Muller. */
 function random_normal(random: () => number): number {
@@ -136,15 +150,126 @@ export function with_drift(kernel: Kernel, drift: number): Kernel {
 	});
 }
 
-/**
- * The kernel with weight `index` set to `weight`, and the difference taken evenly from the
- * others, so the sum stays.
- */
-export function with_weight(kernel: Kernel, index: number, weight: number): Kernel {
+/** The index of the tap at `x`, `y`, each from -2 to 2. */
+function index_of(x: number, y: number): number {
+	return (y + 2) * 5 + (x + 2);
+}
+
+/** The kernel with each weight moved to where `to(x, y)` says, for turns and mirrors. */
+function moved(kernel: Kernel, to: (x: number, y: number) => [number, number]): Kernel {
+	const out = Array.from({ length: TAPS }, () => 0);
+	kernel.forEach((k, i) => {
+		out[index_of(...to((i % 5) - 2, Math.floor(i / 5) - 2))] = k;
+	});
+	return out;
+}
+
+/** Each weight moved by `rate` times its differences from its up to 4 neighbors. */
+function diffused(kernel: Kernel, rate: number): Kernel {
+	return kernel.map((k, i) => {
+		const x = (i % 5) - 2;
+		const y = Math.floor(i / 5) - 2;
+		const neighbors = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([nx, ny]) => Math.abs(nx!) <= 2 && Math.abs(ny!) <= 2);
+		return k + rate * neighbors.reduce((sum, [nx, ny]) => sum + kernel[index_of(nx!, ny!)]! - k, 0);
+	});
+}
+
+/** Ways to rearrange or reshape a kernel, keeping its sum. */
+export const TRANSFORMS = {
+	/** A quarter turn counterclockwise. */
+	turn:    (kernel: Kernel) => moved(kernel, (x, y) => [-y, x]),
+	/** Left to right. */
+	mirror:  (kernel: Kernel) => moved(kernel, (x, y) => [-x, y]),
+	/** Top to bottom. */
+	flip:    (kernel: Kernel) => moved(kernel, (x, y) => [x, -y]),
+	/** Each weight a step toward its neighbors' (each pair trades equally, so the sum stays). */
+	smooth:  (kernel: Kernel) => diffused(kernel, 0.1),
+	/** Each weight a step away from its neighbors'. */
+	roughen: (kernel: Kernel) => diffused(kernel, -0.1),
+} satisfies Record<string, (kernel: Kernel) => Kernel>;
+
+export type Transform = keyof typeof TRANSFORMS;
+
+/** Which taps a drag moves together: one, it and its mirror image through the middle, or its ring. */
+export const GROUPS = ["tap", "pair", "ring"] as const;
+export type Group = (typeof GROUPS)[number];
+
+/** Which taps make up for an edit, keeping the sum: the others evenly, or the middle tap. */
+export const BALANCES = ["others", "middle"] as const;
+export type Balance = (typeof BALANCES)[number];
+
+/** The taps in tap `index`'s group, it included. */
+export function group_of(index: number, group: Group): number[] {
 	A.gte(index, 0);
 	A.lt(index, TAPS);
-	const spread = (weight - kernel[index]!) / (TAPS - 1);
-	return kernel.map((k, i) => (i === index ? weight : k - spread));
+	const x = (index % 5) - 2;
+	const y = Math.floor(index / 5) - 2;
+	if (group === "tap" || (x === 0 && y === 0)) {
+		return [index];
+	}
+	if (group === "pair") {
+		return [index, TAPS - 1 - index];
+	}
+	return Array.from({ length: TAPS }, (_, i) => i).filter((i) => ((i % 5) - 2) ** 2 + (Math.floor(i / 5) - 2) ** 2 === x * x + y * y);
+}
+
+/**
+ * The kernel with `delta` added to each tap of `taps`, and taken back from the others evenly or
+ * from the middle tap, so the sum stays; the others make up when the middle is among `taps`.
+ */
+export function with_delta(kernel: Kernel, taps: number[], delta: number, balance: Balance): Kernel {
+	A.gt(taps.length, 0);
+	const middle = index_of(0, 0);
+	const total  = delta * taps.length;
+	if (balance === "middle" && !taps.includes(middle)) {
+		return kernel.map((k, i) => (taps.includes(i) ? k + delta : i === middle ? k - total : k));
+	}
+	const spread = total / (TAPS - taps.length);
+	return kernel.map((k, i) => (taps.includes(i) ? k + delta : k - spread));
+}
+
+/**
+ * A kernel whose fastest-growing stripes are `fx`, `fy` cycles per pixel, standing still: flat
+ * plus a cosine over where the taps land, as sim.frag rounds them. Its other copies, a whole number
+ * of cycles per tap away, grow as fast.
+ * @param growth What a step multiplies those stripes by, more than 1.
+ */
+export function growing(fx: number, fy: number, spacing: number, growth: number): Kernel {
+	A.gt(growth, 1);
+	const wave = kernel_of((x, y) => Math.cos(2 * Math.PI * (fx * Math.floor(0.5 + spacing * x) + fy * Math.floor(0.5 + spacing * y))));
+	const mean = wave.reduce((sum, w) => sum + w, 0) / TAPS;
+	const bumps = wave.map((w) => w - mean);
+	// The response at f is flat's plus the scale times the bumps', so the scale solves
+	// |F + scale B| = growth.
+	const response = (k: Kernel) => {
+		let re = 0;
+		let im = 0;
+		k.forEach((w, i) => {
+			const a = 2 * Math.PI * (fx * Math.floor(0.5 + spacing * ((i % 5) - 2)) + fy * Math.floor(0.5 + spacing * (Math.floor(i / 5) - 2)));
+			re += w * Math.cos(a);
+			im += w * Math.sin(a);
+		});
+		return [re, im] as const;
+	};
+	const [fr, fi] = response(kernel_of(() => FLAT));
+	const [br, bi] = response(bumps);
+	// |F + s B|^2 = growth^2: a quadratic in s; the positive root.
+	const a = br * br + bi * bi;
+	const b = 2 * (fr * br + fi * bi);
+	const c = fr * fr + fi * fi - growth * growth;
+	A.gt(a, 0);
+	const scale = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+	return bumps.map((w) => FLAT + scale * w);
+}
+
+/**
+ * A kernel near `kernel`: each weight moved by up to about `size`, the moves summing to 0.
+ * @param random Uniform on [0, 1), like Math.random.
+ */
+export function mutated(kernel: Kernel, size: number, random: () => number): Kernel {
+	const moves = kernel.map(() => size * random_normal(random));
+	const mean = moves.reduce((sum, m) => sum + m, 0) / TAPS;
+	return kernel.map((k, i) => k + moves[i]! - mean);
 }
 
 /** Maps [0, 1] onto [0, 1] along half a cosine, so it starts and ends slowly. */

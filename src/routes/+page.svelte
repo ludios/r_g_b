@@ -1,12 +1,13 @@
 <!-- Model-output: Claude Opus 5.5 -->
 <script lang="ts">
+	import { A } from "ayy";
 	import { onMount } from "svelte";
 	import { replaceState } from "$app/navigation";
 	import GrowthMap from "$lib/GrowthMap.svelte";
 	import KernelDiagram from "$lib/KernelDiagram.svelte";
 	import TapsOverlay from "$lib/TapsOverlay.svelte";
 	import { type KernelName, decode, encode } from "$lib/codec";
-	import { type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, next_seed, with_contrast, with_drift, with_weight } from "$lib/kernel";
+	import { BALANCES, type Balance, GROUPS, type Group, type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, TRANSFORMS, type Transform, group_of, growing, mutated, next_seed, with_contrast, with_delta, with_drift } from "$lib/kernel";
 	import { CLICKS, type Click, DEFAULT_SETTINGS, LIKE_R_G_B, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { local_storage } from "$lib/storage";
@@ -126,8 +127,65 @@
 		sync();
 	}
 
+	/** A kernel as it was, for undo: where it came from, and the drift and contrast it was shown with. */
+	interface KernelState {
+		source: Source;
+		kernel: Kernel;
+		contrast: number;
+		drift: number;
+	}
+
+	/** Changes to the kernel that can be undone, latest last, and undone ones that can be redone. */
+	const done: KernelState[] = [];
+	const undone: KernelState[] = [];
+	let can_undo = $state(false);
+	let can_redo = $state(false);
+	/** Steps back that undo keeps. */
+	const UNDOS = 100;
+
+	function now_state(): KernelState {
+		return { source: kernels.source, kernel: kernels.kernel, contrast: settings.contrast, drift: settings.drift };
+	}
+
+	/** Remembers the kernel before a change, for undo. */
+	function remember(): void {
+		done.push(now_state());
+		if (done.length > UNDOS) {
+			done.shift();
+		}
+		undone.length = 0;
+		can_undo = true;
+		can_redo = false;
+	}
+
+	/** Goes back to a remembered kernel; a random one starts its crossfade again. */
+	function restore(state: KernelState): void {
+		if (state.source.kind === "seed") {
+			kernels.jump(state.source.seed);
+		} else if (state.source.kind === "preset") {
+			kernels.choose(state.source.name);
+		} else {
+			kernels.edit(state.kernel);
+		}
+		settings.contrast = state.contrast;
+		settings.drift    = state.drift;
+		sync();
+	}
+
+	/** Moves the latest state from one stack to the other, putting the current one on the other. */
+	function travel(from: KernelState[], to: KernelState[]): void {
+		const state = from.pop();
+		if (state !== undefined) {
+			to.push(now_state());
+			restore(state);
+		}
+		can_undo = done.length > 0;
+		can_redo = undone.length > 0;
+	}
+
 	/** Goes back to random kernels, or to a preset; a preset is shown as it is, without drift or contrast. */
 	function choose(choice: string): void {
+		remember();
 		const preset = PRESET_NAMES.find((name) => name === choice);
 		if (preset === undefined) {
 			jump(last_seed ?? random_seed());
@@ -139,12 +197,37 @@
 		sync();
 	}
 
-	/** Sets a weight of the kernel as shown, which becomes the kernel, without drift or contrast. */
-	function edit_weight(index: number, weight: number): void {
-		kernels.edit(with_weight(shown, index, weight));
+	/** Makes `kernel` the kernel, made from the one shown, so without drift or contrast of its own. */
+	function take(kernel: Kernel): void {
+		kernels.edit(kernel);
 		settings.contrast = 1;
 		settings.drift    = 1;
 		sync();
+	}
+
+	/** Which taps a drag moves together, and which make up for it so the sum stays 1. */
+	let group   = $state<Group>("tap");
+	let balance = $state<Balance>("middle");
+
+	/** Sets a dragged weight of the kernel shown, moving its group's weights as much. */
+	function edit_weight(index: number, weight: number): void {
+		take(with_delta(shown, group_of(index, group), weight - shown[index]!, balance));
+	}
+
+	function transform(name: Transform): void {
+		remember();
+		take(TRANSFORMS[name](shown));
+	}
+
+	function mutate(): void {
+		remember();
+		take(mutated(shown, 0.03, Math.random));
+	}
+
+	/** Makes a kernel that grows stripes of `fx`, `fy` cycles per pixel, half again each step. */
+	function grow(fx: number, fy: number): void {
+		remember();
+		take(growing(fx, fy, settings.spacing, 1.5));
 	}
 
 	/** A random kernel number, small enough to read. */
@@ -153,6 +236,7 @@
 	}
 
 	function new_kernel(): void {
+		remember();
 		jump(random_seed());
 	}
 
@@ -160,6 +244,7 @@
 	function commit_seed(event: Event & { currentTarget: HTMLInputElement }): void {
 		const typed = event.currentTarget.valueAsNumber;
 		if (Number.isInteger(typed) && typed >= 0 && typed <= MAX_SEED) {
+			remember();
 			jump(typed);
 		}
 		event.currentTarget.value = String(last_seed ?? "");
@@ -310,7 +395,7 @@
 		paused = !paused;
 	}
 
-	/** Space pauses and Enter steps, except where they already mean something. */
+	/** Space pauses, Enter steps, and Z and shift-Z undo and redo, except where they already mean something. */
 	function on_key(event: KeyboardEvent): void {
 		if (event.target instanceof Element && event.target.closest("input, select, button, textarea, summary")) {
 			return;
@@ -320,6 +405,13 @@
 			toggle_pause();
 		} else if (event.code === "Enter" && paused) {
 			step_once();
+		} else if (event.code === "KeyZ" && !event.altKey) {
+			event.preventDefault();
+			if (event.shiftKey) {
+				travel(undone, done);
+			} else {
+				travel(done, undone);
+			}
 		}
 	}
 
@@ -329,7 +421,19 @@
 
 	const MOUSE_LABELS:  Record<MouseTarget, string> = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence", r_g_b: "Spacing + persistence" };
 	const CLICK_LABELS:  Record<Click, string>  = { kernel: "New kernel", paint: "Paint", erase: "Erase", taps: "Show taps" };
-	const PRESET_LABELS: Record<Preset, string> = { identity: "Identity", box: "Box blur", shift: "Shift", row: "One row", ring: "Center-surround", checker: "Checkerboard" };
+	const PRESET_LABELS: Record<Preset, string> = {
+		identity: "Identity", box: "Box blur", shift: "Shift", lean: "Lean", skip: "Every other tap",
+		row: "One row", saddle: "Saddle", ring: "Center-surround", dots: "Dots", sharpen: "Sharpen",
+		checker: "Checkerboard", advect: "Advect",
+	};
+	const PRESET_GROUPS: [string, Preset[]][] = [
+		["Nothing grows", ["identity", "box", "shift", "lean", "skip"]],
+		["Stripes grow", ["row", "saddle", "ring", "dots", "sharpen"]],
+		["Stripes grow and move", ["checker", "advect"]],
+	];
+	A.eq(PRESET_GROUPS.flatMap(([, names]) => names).toSorted().join(), PRESET_NAMES.toSorted().join());
+	const GROUP_LABELS:   Record<Group, string>   = { tap: "one tap", pair: "a tap and the one opposite", ring: "a tap's whole ring" };
+	const BALANCE_LABELS: Record<Balance, string> = { middle: "the middle tap", others: "all the other taps" };
 	const SEED_LABELS:  Record<Seeds, string> = { rgb: "R G B dots", white: "White dot", pixel: "One pixel", none: "None" };
 	const VIEW_LABELS:  Record<View, string>  = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
@@ -367,8 +471,12 @@
 						<span>Kernel</span>
 						<select class="wide" value={source.kind === "seed" ? "random" : source.kind === "preset" ? source.name : "edited"} onchange={(e) => choose(e.currentTarget.value)}>
 							<option value="random">Random</option>
-							{#each PRESET_NAMES as name (name)}
-								<option value={name}>{PRESET_LABELS[name]}</option>
+							{#each PRESET_GROUPS as [label, names] (label)}
+								<optgroup label={label}>
+									{#each names as name (name)}
+										<option value={name}>{PRESET_LABELS[name]}</option>
+									{/each}
+								</optgroup>
 							{/each}
 							{#if source.kind === "edited"}
 								<option value="edited" disabled>Edited</option>
@@ -379,9 +487,9 @@
 						<div class="row">
 							<span>Number</span>
 							<div class="seed">
-								<button type="button" onclick={() => jump((last_seed ?? 0) - 1)} aria-label="Previous kernel">‹</button>
+								<button type="button" onclick={() => (remember(), jump((last_seed ?? 0) - 1))} aria-label="Previous kernel">‹</button>
 								<input type="number" min="0" max={MAX_SEED} step="1" value={source.seed} onchange={commit_seed} aria-label="Kernel number" />
-								<button type="button" onclick={() => jump((last_seed ?? 0) + 1)} aria-label="Next kernel">›</button>
+								<button type="button" onclick={() => (remember(), jump((last_seed ?? 0) + 1))} aria-label="Next kernel">›</button>
 							</div>
 							<output>{settings.morph ? `to ${next_seed(source.seed)}` : ""}</output>
 						</div>
@@ -396,10 +504,36 @@
 						{/if}
 					{/if}
 					<div class="figures">
-						<KernelDiagram kernel={shown} onedit={edit_weight} />
-						<GrowthMap model={model} theme={theme.theme} onplant={(fx, fy) => restart({ fx, fy })} bind:caption={map_caption} />
+						<KernelDiagram kernel={shown} group={group} onstart={remember} onedit={edit_weight} />
+						<GrowthMap model={model} theme={theme.theme} onplant={(fx, fy) => restart({ fx, fy })} ongrow={grow} bind:caption={map_caption} />
 					</div>
 					<p class="muted">{map_caption}</p>
+					<div class="tools">
+						<button type="button" onclick={() => travel(done, undone)} disabled={!can_undo}>Undo</button>
+						<button type="button" onclick={() => travel(undone, done)} disabled={!can_redo}>Redo</button>
+						<button type="button" onclick={() => transform("turn")} aria-label="Turn a quarter counterclockwise">↺</button>
+						<button type="button" onclick={() => transform("mirror")} aria-label="Mirror left to right">⇆</button>
+						<button type="button" onclick={() => transform("flip")} aria-label="Mirror top to bottom">⇅</button>
+						<button type="button" onclick={() => transform("smooth")}>Smooth</button>
+						<button type="button" onclick={() => transform("roughen")}>Roughen</button>
+						<button type="button" onclick={mutate}>Mutate</button>
+					</div>
+					<label class="row">
+						<span>Drag moves</span>
+						<select class="wide" bind:value={group}>
+							{#each GROUPS as g (g)}
+								<option value={g}>{GROUP_LABELS[g]}</option>
+							{/each}
+						</select>
+					</label>
+					<label class="row">
+						<span>Made up by</span>
+						<select class="wide" bind:value={balance}>
+							{#each BALANCES as b (b)}
+								<option value={b}>{BALANCE_LABELS[b]}</option>
+							{/each}
+						</select>
+					</label>
 					<label class="row">
 						<span>Contrast</span>
 						<input type="range" min="0" max={SLIDERS.contrast.positions} value={position_of(SLIDERS.contrast, settings.contrast)} oninput={(e) => slide("contrast", e)} />
@@ -687,6 +821,18 @@
 		align-items: flex-start;
 		gap: 12px 24px;
 		margin: 6px 0 0;
+	}
+
+	.tools {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		margin: 4px 0 6px;
+	}
+	.tools button {
+		padding: 0 7px;
+		font-size: 12px;
+		line-height: 20px;
 	}
 
 	.seed {

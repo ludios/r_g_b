@@ -12,11 +12,13 @@
 		theme: string;
 		/** Called with a wave's cycles per pixel, across and up, when it's clicked. */
 		onplant: (fx: number, fy: number) => void;
+		/** The same, when it's shift-clicked. */
+		ongrow: (fx: number, fy: number) => void;
 		/** Set to the fastest stripes in words, or those under the pointer; for the page to show. */
 		caption?: string;
 	}
 
-	let { model, theme, onplant, caption = $bindable("") }: Props = $props();
+	let { model, theme, onplant, ongrow, caption = $bindable("") }: Props = $props();
 
 	const SIZE = 121;
 	/** Redrawn at most this often, since a morphing kernel changes every frame. */
@@ -25,7 +27,9 @@
 	let canvas: HTMLCanvasElement;
 	// Raw: a deep proxy over its arrays would make every read slow.
 	let map     = $state.raw<GrowthMap | null>(null);
-	let hovered = $state<Mode | null>(null);
+	/** The point under the pointer, if any, read from the map as it's redrawn. */
+	let pointed = $state<number | null>(null);
+	const hovered = $derived(map === null || pointed === null ? null : mode_at(map, pointed));
 	const peak  = $derived(map === null ? null : fastest(map));
 	let last    = 0;
 
@@ -120,15 +124,12 @@
 		return a.map((v, i) => Math.round(v + (b[i]! - v) * t));
 	}
 
-	/** The mode under the pointer. */
-	function at(event: PointerEvent): Mode | null {
-		if (map === null) {
-			return null;
-		}
+	/** The index of the point under the pointer. */
+	function at(event: PointerEvent): number {
 		const box    = canvas.getBoundingClientRect();
 		const column = Math.round(((event.clientX - box.left) / box.width) * SIZE - 0.5);
 		const row    = Math.round(((event.clientY - box.top) / box.height) * SIZE - 0.5);
-		return mode_at(map, Math.min(SIZE - 1, Math.max(0, row)) * SIZE + Math.min(SIZE - 1, Math.max(0, column)));
+		return Math.min(SIZE - 1, Math.max(0, row)) * SIZE + Math.min(SIZE - 1, Math.max(0, column));
 	}
 
 	/** A mode in words: its stripes' spacing, growth and motion. */
@@ -142,22 +143,25 @@
 	}
 
 	$effect(() => {
-		caption = hovered !== null ? `Here: ${words(hovered)} Click to start from them.`
+		caption = hovered !== null ? `Here: ${words(hovered)} Click to start from them; shift-click for a kernel that grows them.`
 			: peak !== null ? `Fastest: ${words(peak)}`
 			: map !== null ? "Nothing grows: every pattern fades."
 			: "";
 	});
 
 	function plant(event: PointerEvent): void {
-		const mode = at(event);
-		if (mode !== null) {
-			onplant(mode.fx, mode.fy);
+		if (map === null) {
+			return;
+		}
+		const mode = mode_at(map, at(event));
+		if (Math.hypot(mode.fx, mode.fy) > 0) {
+			(event.shiftKey ? ongrow : onplant)(mode.fx, mode.fy);
 		}
 	}
 </script>
 
 <canvas bind:this={canvas} width={SIZE} height={SIZE} aria-label="Which stripes grow"
-	onpointermove={(e) => (hovered = at(e))} onpointerleave={() => (hovered = null)} onpointerup={plant}></canvas>
+	onpointermove={(e) => (pointed = at(e))} onpointerleave={() => (pointed = null)} onpointerup={plant}></canvas>
 
 <style>
 	/* color, background-color, caret-color and outline-color carry the palette to draw(). */
