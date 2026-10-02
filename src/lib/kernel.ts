@@ -23,6 +23,8 @@ export const FLAT = 1 / TAPS;
 
 /** Where tap `i` is in the kernel: x and y from -2 to 2, up being +y. */
 export function tap_offset(i: number): { x: number; y: number } {
+	A.gte(i, 0);
+	A.lt(i, TAPS);
 	return { x: (i % 5) - 2, y: Math.floor(i / 5) - 2 };
 }
 
@@ -294,24 +296,31 @@ export class Kernels {
 		return this.#to.map((k, i) => k * t + this.#from[i]! * (1 - t));
 	}
 
-	/** Jumps to the random kernel numbered `seed`, fading toward the next. */
-	jump(seed: number): void {
+	/**
+	 * Jumps to the random kernel numbered `seed`, fading toward the next.
+	 * @param progress How far the crossfade has gone already, from 0 up to 1.
+	 */
+	jump(seed: number, progress = 0): void {
+		A.gte(progress, 0);
+		A.lt(progress, 1);
 		this.#source = { kind: "seed", seed };
 		this.#from = seeded_kernel(seed);
 		this.#to = seeded_kernel(next_seed(seed));
-		this.#progress = 0;
-		log.info("kernel {seed}", { seed });
+		this.#progress = progress;
+		log.info("kernel {seed} at {progress}", { seed, progress });
 	}
 
 	choose(name: Preset): void {
 		this.#set({ kind: "preset", name }, PRESETS[name]);
 	}
 
-	/** Takes weights edited by hand. */
-	edit(kernel: Kernel): void {
+	/**
+	 * Takes weights edited by hand.
+	 * @param dragging Whether this is one move of a drag, logged only at debug level.
+	 */
+	edit(kernel: Kernel, dragging = false): void {
 		this.#set({ kind: "edited" }, kernel);
-		// Debug: a drag edits on every move.
-		log.debug("edited kernel {kernel}", { kernel: JSON.stringify(kernel) });
+		log[dragging ? "debug" : "info"]("edited kernel {kernel}", { kernel: JSON.stringify(kernel) });
 	}
 
 	/**

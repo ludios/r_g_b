@@ -30,6 +30,9 @@ const KEYS = {
 	paint:       "pc",
 } as const satisfies Record<keyof Settings, string>;
 
+/** The most a weight read from a URL may weigh, either way: far past anything the page makes. */
+const MOST_WEIGHT = 1000;
+
 /** A kernel as a URL names it: a random one by its seed, a preset, or weights. */
 export type KernelName = number | Preset | Kernel;
 
@@ -37,16 +40,24 @@ export type KernelName = number | Preset | Kernel;
 export interface Decoded {
 	settings: Settings;
 	kernel: KernelName | null;
+	/** How far a random kernel's crossfade has gone, from 0 up to 1; "kp". */
+	progress: number;
 }
 
-/** Encodes the settings that differ from the defaults, and the kernel, as `key=value&...`. */
-export function encode(settings: Settings, kernel: KernelName): string {
+/**
+ * Encodes the settings that differ from the defaults, and the kernel, as `key=value&...`.
+ * @param progress How far a random kernel's crossfade has gone, if it's held partway.
+ */
+export function encode(settings: Settings, kernel: KernelName, progress = 0): string {
 	const q = new URLSearchParams();
 	if (Array.isArray(kernel)) {
 		// Six decimals are plenty; decoding puts the sum back at exactly 1.
 		q.set("w", kernel.map((k) => Number(k.toFixed(6))).join(","));
 	} else {
 		q.set("k", String(kernel));
+	}
+	if (typeof kernel === "number" && progress > 0) {
+		q.set("kp", String(Number(progress.toFixed(6))));
 	}
 	for (const key of Object.keys(KEYS) as (keyof Settings)[]) {
 		const value = settings[key];
@@ -107,8 +118,16 @@ export function decode(query: string): Decoded {
 			brush:       number("brush"),
 			paint:       paint !== null && /^#[0-9a-f]{6}$/.test(paint) ? paint : d.paint,
 		},
-		kernel: decode_kernel(q),
+		kernel:   decode_kernel(q),
+		progress: decode_progress(q),
 	};
+}
+
+/** A held crossfade's progress from "kp", from 0 up to 1, or 0. */
+function decode_progress(q: URLSearchParams): number {
+	const raw = q.get("kp");
+	const n   = raw === null || raw === "" ? NaN : Number(raw);
+	return n >= 0 && n < 1 ? n : 0;
 }
 
 /** The kernel `q` names, if any: weights in "w" win over "k". */
@@ -118,8 +137,8 @@ function decode_kernel(q: URLSearchParams): KernelName | null {
 		// Any sum but 1 brightens or darkens flat areas, step after step.
 		const adjustment = (1 - weights.reduce((s, k) => s + k, 0)) / TAPS;
 		const kernel = weights.map((k) => k + adjustment);
-		// Huge weights can sum past the largest number.
-		if (kernel.every(Number.isFinite)) {
+		// Huge weights can sum past the largest number, or pass float32's in the shader.
+		if (kernel.every((k) => Math.abs(k) <= MOST_WEIGHT)) {
 			return kernel;
 		}
 	}

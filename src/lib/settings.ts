@@ -121,7 +121,8 @@ export const SLIDERS = {
 	contrast:    { min: 0,      max: 4,     scale: "linear", positions: 200 },
 	drift:       { min: -2,     max: 2,     scale: "linear", positions: 200 },
 	morph_steps: { min: 60,     max: 36000, scale: "log",    positions: 120, integer: true },
-	spacing:     { min: 0.25,   max: 256,   scale: "log",    positions: 240 },
+	// Below 0.25, every tap rounds to the pixel itself; at 0.25 exactly, +2 and -2 round unevenly.
+	spacing:     { min: 0.2,    max: 256,   scale: "log",    positions: 240 },
 	jitter:      { min: 0,      max: 0.25,  scale: "linear", positions: 100 },
 	persistence: { min: -1,     max: 1,     scale: "linear", positions: 400 },
 	speed:       { min: 1 / 32, max: 8,     scale: "log",    positions: 8 },

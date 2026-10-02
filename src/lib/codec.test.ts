@@ -33,7 +33,7 @@ const settings = record({
 describe("codec", () => {
 	test("decodes what it encodes", () => {
 		assert(property(settings, integer({ min: 0, max: MAX_SEED }), (s, seed) => {
-			expect(decode(encode(s, seed))).toEqual({ settings: s, kernel: seed });
+			expect(decode(encode(s, seed))).toEqual({ settings: s, kernel: seed, progress: 0 });
 		}));
 	});
 
@@ -45,6 +45,14 @@ describe("codec", () => {
 		expect(decoded.reduce((s, k) => s + k, 0)).toBeCloseTo(1, 14);
 		expect(decode("w=1,2,3&k=5").kernel).toBe(5);
 		expect(decode(`w=${Array.from({ length: 25 }, () => "1e308").join(",")}&k=6`).kernel).toBe(6);
+		expect(decode(`w=1e39,-1e39,${Array.from({ length: 23 }, () => "0").join(",")}&k=6`).kernel).toBe(6);
+	});
+
+	test("keeps a held crossfade's progress with its seed", () => {
+		expect(decode(encode(DEFAULT_SETTINGS, 9, 0.42))).toMatchObject({ kernel: 9, progress: 0.42 });
+		expect(encode(DEFAULT_SETTINGS, "ring", 0.42)).toBe("k=ring");
+		expect(decode("k=9&kp=1").progress).toBe(0);
+		expect(decode("k=9&kp=-0.5").progress).toBe(0);
 	});
 
 	test("writes only the seed for the defaults", () => {
@@ -59,8 +67,8 @@ describe("codec", () => {
 	});
 
 	test("reads junk as the defaults, and numbers past an end as that end", () => {
-		expect(decode("?k=-1&c=pony&mx=everything&m=yes")).toEqual({ settings: DEFAULT_SETTINGS, kernel: null });
+		expect(decode("?k=-1&c=pony&mx=everything&m=yes")).toEqual({ settings: DEFAULT_SETTINGS, kernel: null, progress: 0 });
 		expect(decode("").settings).toEqual(DEFAULT_SETTINGS);
-		expect(decode("s=9999&p=-3&k=1.5")).toEqual({ settings: { ...DEFAULT_SETTINGS, spacing: SLIDERS.spacing.max, persistence: -1 }, kernel: null });
+		expect(decode("s=9999&p=-3&k=1.5")).toEqual({ settings: { ...DEFAULT_SETTINGS, spacing: SLIDERS.spacing.max, persistence: -1 }, kernel: null, progress: 0 });
 	});
 });

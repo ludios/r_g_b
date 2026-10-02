@@ -71,3 +71,14 @@ button:hover {
 a {
 	color: var(--accent);
 }
+
+/* A small uppercase title centered above a figure, such as the kernel diagram and the map. */
+.figure-title {
+	text-align: center;
+	font-size: 10px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	white-space: nowrap;
+	margin-bottom: 2px;
+}

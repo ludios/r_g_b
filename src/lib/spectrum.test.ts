@@ -2,6 +2,7 @@
 import { assert, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
 import { PRESETS, TAPS, gen_kernel, seeded_kernel } from "./kernel";
+import { SLIDERS } from "./settings";
 import { type StepModel, fastest, growing, growth_map, mode_at, motion, multiplier } from "./spectrum";
 
 /** `n` modulo `m`, in [0, m) even for negative `n`. */
@@ -78,22 +79,29 @@ describe("growth_map", () => {
 });
 
 describe("growing", () => {
-	test("grows the wave it's made for as much as asked, fastest", () => {
-		const spacing = 8;
-		const kernel = growing(0.03, -0.02, spacing, 1.5)!;
-		const model = { kernel, spacing, jitter: 0, persistence: 0 };
+	test("grows the wave it's made for as much as asked, through jitter and persistence", () => {
+		const taps = { spacing: 8, jitter: 0.05, persistence: 0.5 };
+		const kernel = growing(0.03, -0.02, taps, 1.5)!;
 		expect(kernel.reduce((s, k) => s + k, 0)).toBeCloseTo(1, 12);
-		expect(multiplier(model, 0.03, -0.02).growth).toBeCloseTo(1.5, 9);
-		expect(fastest(growth_map(model, 101))!.growth).toBeLessThan(1.5 + 0.02);
+		expect(multiplier({ ...taps, kernel }, 0.03, -0.02).growth).toBeCloseTo(1.5, 9);
+		expect(multiplier({ ...taps, kernel }, 0.03, -0.02).phase).toBeCloseTo(0, 9);
 	});
 
-	test("won't grow what the taps see as flat, and keeps weights small elsewhere", () => {
-		expect(growing(0.1, 0, 10, 1.5)).toBeNull(); // An alias of flat: whole cycles at every tap
-		expect(growing(0.001, 0, 10, 1.5)).toBeNull(); // Far wider than the taps reach
-		assert(property(double({ min: -0.5, max: 0.5, noNaN: true }), double({ min: -0.5, max: 0.5, noNaN: true }), double({ min: 1, max: 40, noNaN: true }), (fx, fy, spacing) => {
-			const kernel = growing(fx, fy, spacing, 1.5);
-			expect(kernel === null || kernel.every((k) => Math.abs(k) < 5)).toBe(true);
-		}));
+	test("grows wide stripes a small kernel can, and not what the taps see as flat", () => {
+		const taps = { spacing: 10, jitter: 0.05, persistence: 0 };
+		expect(growing(0.005, 0, taps, 1.5)).not.toBeNull(); // 200 px apart
+		expect(growing(0.1, 0, taps, 1.5)).toBeNull(); // A copy of flat: whole cycles at every tap
+		expect(growing((0.15 / 87) * 58, 0, taps, 1.5)).toBeNull(); // The same, as the map works it out
+		expect(growing(0.03, 0, { ...taps, persistence: 1 }, 1.5)).toBeNull(); // Nothing changes
+	});
+
+	test("keeps its weights at 3 or less", () => {
+		const { min, max } = SLIDERS.spacing;
+		assert(property(double({ min: -0.5, max: 0.5, noNaN: true }), double({ min: -0.5, max: 0.5, noNaN: true }), double({ min, max, noNaN: true }),
+			double({ min: -1, max: 1, noNaN: true }), (fx, fy, spacing, persistence) => {
+				const kernel = growing(fx, fy, { spacing, jitter: 0.05, persistence }, 1.5);
+				expect(kernel === null || kernel.every((k) => Math.abs(k) <= 3)).toBe(true);
+			}));
 	});
 });
 

@@ -13,8 +13,8 @@
 		theme: string;
 		/** Called with a wave's cycles per pixel, across and up, when it's clicked. */
 		onplant: (fx: number, fy: number) => void;
-		/** The same, when it's shift-clicked. */
-		ongrow: (fx: number, fy: number) => void;
+		/** The same, when it's shift-clicked; returns whether it made a kernel. */
+		ongrow: (fx: number, fy: number) => boolean;
 		/** Set to the fastest stripes in words, or those under the pointer; for the page to show. */
 		caption?: string;
 	}
@@ -30,6 +30,8 @@
 	let map     = $state.raw<GrowthMap | null>(null);
 	/** The point under the pointer, if any, read from the map as it's redrawn. */
 	let pointed = $state<number | null>(null);
+	/** The point last shift-clicked, if no kernel could be made for it. */
+	let refused = $state<number | null>(null);
 	const hovered = $derived(map === null || pointed === null ? null : mode_at(map, pointed));
 	/** The map's fastest stripes, found as it's made. */
 	let peak    = $state.raw<Mode | null>(null);
@@ -76,16 +78,10 @@
 	}
 
 	/** The palette, and what it was read for: the theme setting and the browser's preference. */
-	let cached: { key: string; palette: Palette } | null = null;
-
 	/** The page's palette, resolved: the canvas's CSS borrows properties to carry it. */
 	function palette(): Palette {
-		const key = `${theme} ${matchMedia("(prefers-color-scheme: dark)").matches}`;
-		if (cached?.key !== key) {
-			const style = getComputedStyle(canvas);
-			cached = { key, palette: { card: rgb(style.backgroundColor), accent: rgb(style.color), text: rgb(style.caretColor), rule: style.outlineColor } };
-		}
-		return cached.palette;
+		const style = getComputedStyle(canvas);
+		return { card: rgb(style.backgroundColor), accent: rgb(style.color), text: rgb(style.caretColor), rule: style.outlineColor };
 	}
 
 	/**
@@ -148,10 +144,14 @@
 		return a.map((v, i) => Math.round(v + (b[i]! - v) * t));
 	}
 
-	/** The index of the point under the pointer: offsetX and offsetY are inside the border. */
+	/**
+	 * The index of the point under the pointer, measured inside the canvas's border (offsetX would
+	 * do, but Chrome measures it from outside the border).
+	 */
 	function at(event: MouseEvent): number {
-		const column = Math.floor((event.offsetX / canvas.clientWidth) * SIZE);
-		const row    = Math.floor((event.offsetY / canvas.clientHeight) * SIZE);
+		const box    = canvas.getBoundingClientRect();
+		const column = Math.floor(((event.clientX - box.left - canvas.clientLeft) / canvas.clientWidth) * SIZE);
+		const row    = Math.floor(((event.clientY - box.top - canvas.clientTop) / canvas.clientHeight) * SIZE);
 		return Math.min(SIZE - 1, Math.max(0, row)) * SIZE + Math.min(SIZE - 1, Math.max(0, column));
 	}
 
@@ -166,7 +166,8 @@
 	}
 
 	$effect(() => {
-		caption = hovered !== null ? `Here: ${words(hovered)} Click: start from them. Shift-click: a kernel that grows them.`
+		caption = hovered !== null && refused === pointed ? `Here: ${words(hovered)} No kernel with small weights grows them.`
+			: hovered !== null ? `Here: ${words(hovered)} Click: start from them. Shift-click: a kernel that grows them.`
 			: peak !== null ? `Fastest: ${words(peak)}`
 			: map !== null ? "Nothing grows: every pattern fades."
 			: "";
@@ -176,15 +177,21 @@
 		if (map === null) {
 			return;
 		}
-		const mode = mode_at(map, at(event));
-		if (Math.hypot(mode.fx, mode.fy) > 0) {
-			(event.shiftKey ? ongrow : onplant)(mode.fx, mode.fy);
+		const index = at(event);
+		const mode  = mode_at(map, index);
+		if (Math.hypot(mode.fx, mode.fy) === 0) {
+			return;
+		}
+		if (!event.shiftKey) {
+			onplant(mode.fx, mode.fy);
+		} else if (!ongrow(mode.fx, mode.fy)) {
+			refused = index;
 		}
 	}
 </script>
 
 <figure>
-	<div class="title">Frequency response</div>
+	<div class="figure-title">Frequency response</div>
 	<canvas bind:this={canvas} width={SIZE} height={SIZE} aria-label="Frequency response: which stripes grow"
 		onpointermove={(e) => (pointed = at(e))} onpointerleave={() => (pointed = null)} onclick={plant}></canvas>
 	<figcaption>Middle: flat; edge: fine stripes.<br />Shaded: grows; hatched: inverts.</figcaption>
@@ -196,15 +203,6 @@
 	figure {
 		margin: 0;
 		width: 177px;
-	}
-	.title {
-		text-align: center;
-		font-size: 10px;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: var(--text-muted);
-		white-space: nowrap;
-		margin-bottom: 2px;
 	}
 	figcaption {
 		font-size: 11px;

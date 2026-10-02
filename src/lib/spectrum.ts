@@ -6,7 +6,7 @@
 // turn. The step is linear but for the clamp, so a pattern is a sum of such stripes, each on its own
 // until the clamp catches it.
 import { A } from "ayy";
-import { FLAT, type Kernel, TAPS, tap_offset, tap_pixels } from "./kernel";
+import { FLAT, type Kernel, PRESETS, TAPS, tap_offset, tap_pixels } from "./kernel";
 
 /** The parts of the step that M depends on; see Settings for their meanings. */
 export interface StepModel {
@@ -43,12 +43,12 @@ function sinc(x: number): number {
 }
 
 /**
- * M(f) for a wave with `fx`, `fy` cycles per pixel. Each tap reads the texel at
- * floor(0.5 + spacing * d) pixels away, as sim.frag rounds it; the jitter scales each pixel's
- * spacing by a different amount, which this averages over (as if each tap's scale were uniform
- * and independent), damping the taps' waves more the farther they reach.
+ * M(f) for a wave with `fx`, `fy` cycles per pixel, as a complex number. Each tap reads the texel
+ * at tap_pixels(), as sim.frag rounds it; the jitter scales each pixel's spacing by a different
+ * amount, which this averages over (as if each tap's scale were uniform and independent), damping
+ * the taps' waves more the farther they reach.
  */
-export function multiplier(model: StepModel, fx: number, fy: number): Mode {
+export function response(model: StepModel, fx: number, fy: number): { re: number; im: number } {
 	A.eq(model.kernel.length, TAPS);
 	const { kernel, spacing, jitter, persistence } = model;
 	let re = 0;
@@ -61,8 +61,12 @@ export function multiplier(model: StepModel, fx: number, fy: number): Mode {
 		im += kernel[i]! * damp * Math.sin(2 * Math.PI * along);
 	}
 	const p = Math.min(1, Math.max(-1, persistence));
-	re = p + (1 - p) * re;
-	im = (1 - p) * im;
+	return { re: p + (1 - p) * re, im: (1 - p) * im };
+}
+
+/** M(f) for a wave with `fx`, `fy` cycles per pixel, as a mode. */
+export function multiplier(model: StepModel, fx: number, fy: number): Mode {
+	const { re, im } = response(model, fx, fy);
 	return { fx, fy, growth: Math.hypot(re, im), phase: Math.atan2(im, re) };
 }
 
@@ -167,36 +171,41 @@ export function fastest(map: GrowthMap): Mode | null {
 	return best === null ? null : mode_at(map, best);
 }
 
+/** The most a weight of a kernel from growing() may weigh, either way. */
+const MOST_WEIGHT = 3;
+
 /**
- * A kernel whose fastest-growing stripes are `fx`, `fy` cycles per pixel, standing still: flat
- * plus a cosine over where the taps land. Its other copies, a whole number of cycles per tap
- * away, grow as fast. Null for stripes the taps see as nearly flat, which only huge weights
- * could grow: the aliases of flat, and stripes much wider than the taps reach.
- * @param growth What a step multiplies those stripes by, more than 1.
+ * A kernel under which stripes of `fx`, `fy` cycles per pixel grow `growth` times a step, standing
+ * still, with the taps as `taps` has them: flat plus a cosine over where the taps land. Other
+ * stripes can grow too, some faster, and copies a whole cycle per tap away grow alike. Null where
+ * that takes a weight over MOST_WEIGHT: where the taps see the stripes as nearly flat (its copies,
+ * and stripes far wider than the taps reach), or persistence keeps nearly everything.
  */
-export function growing(fx: number, fy: number, spacing: number, growth: number): Kernel | null {
+export function growing(fx: number, fy: number, taps: Omit<StepModel, "kernel">, growth: number): Kernel | null {
 	A.gt(growth, 1);
-	const wave  = Array.from({ length: TAPS }, (_, i) => Math.cos(2 * Math.PI * (fx * tap_pixels(spacing, tap_offset(i).x) + fy * tap_pixels(spacing, tap_offset(i).y))));
+	const wave  = Array.from({ length: TAPS }, (_, i) => Math.cos(2 * Math.PI * (fx * tap_pixels(taps.spacing, tap_offset(i).x) + fy * tap_pixels(taps.spacing, tap_offset(i).y))));
 	const mean  = wave.reduce((sum, w) => sum + w, 0) / TAPS;
 	const bumps = wave.map((w) => w - mean);
-	// The bumps' response at f is about their energy, and the scale about growth over it, so
-	// below an energy of 1 the weights would pass a few.
-	if (bumps.reduce((sum, b) => sum + b * b, 0) < 1) {
+	// At a copy of flat, the bumps are only rounding error, which any scale would just magnify.
+	if (bumps.reduce((sum, w) => sum + w * w, 0) < 1e-6) {
 		return null;
 	}
-	// M(f) is flat's response plus the scale times the bumps', so the scale solves
-	// |F + scale B| = growth: a quadratic, whose positive root this is.
-	const at = (kernel: Kernel) => {
-		const { growth: g, phase } = multiplier({ kernel, spacing, jitter: 0, persistence: 0 }, fx, fy);
-		return [g * Math.cos(phase), g * Math.sin(phase)] as const;
-	};
-	const [fr, fi] = at(Array.from({ length: TAPS }, () => FLAT));
-	const [br, bi] = at(bumps);
-	const a = br * br + bi * bi;
-	const b = 2 * (fr * br + fi * bi);
-	const c = fr * fr + fi * fi - growth * growth;
-	const scale = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
-	return bumps.map((w) => FLAT + scale * w);
+	// M is flat's plus the scale times the bumps' response through the persistence, so the scale
+	// solves |F + scale B| = growth: a quadratic, whose positive root this is.
+	const p    = Math.min(1, Math.max(-1, taps.persistence));
+	const flat = response({ ...taps, kernel: PRESETS.box }, fx, fy);
+	const bump = response({ ...taps, kernel: bumps, persistence: 0 }, fx, fy);
+	const br = (1 - p) * bump.re;
+	const bi = (1 - p) * bump.im;
+	const a  = br * br + bi * bi;
+	const b  = 2 * (flat.re * br + flat.im * bi);
+	const c  = flat.re * flat.re + flat.im * flat.im - growth * growth;
+	if (a === 0) {
+		return null;
+	}
+	const scale  = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+	const kernel = bumps.map((w) => FLAT + scale * w);
+	return kernel.every((k) => Math.abs(k) <= MOST_WEIGHT) ? kernel : null;
 }
 
 /** A mode in pixels: how far apart its stripes are, and how far a step moves them. */

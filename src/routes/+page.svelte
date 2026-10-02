@@ -1,5 +1,6 @@
 <!-- Model-output: Claude Opus 5.5 -->
 <script lang="ts">
+	import { getLogger } from "@logtape/logtape";
 	import { A } from "ayy";
 	import { onMount } from "svelte";
 	import { replaceState } from "$app/navigation";
@@ -13,6 +14,8 @@
 	import { growing } from "$lib/spectrum";
 	import { local_storage } from "$lib/storage";
 	import { THEMES, type Theme, ThemeChoice, parse_theme } from "$lib/theme.svelte";
+
+	const log = getLogger(["r_g_b", "page"]);
 
 	let settings   = $state<Settings>({ ...DEFAULT_SETTINGS });
 	let paused     = $state(false);
@@ -54,7 +57,8 @@
 
 	let canvas: HTMLCanvasElement;
 	let chrome: HTMLElement;
-	let sim: Simulation | undefined;
+	// State, so the restart effect runs once there's a simulation to restart.
+	let sim = $state.raw<Simulation | undefined>();
 	// The page is prerendered with some kernel; the URL's, or a random one, takes over once mounted.
 	const kernels = new Kernels(0);
 	/** The kernels' source and kernel as reactive state, which sync() updates. */
@@ -68,7 +72,7 @@
 	let map_caption = $state("");
 	/** How far the kernels' crossfade has gone, as reactive state, which sync() updates. */
 	let progress  = $state(0);
-	const encoded = $derived(encode(settings, name_of(source, base, !settings.morph && progress > 0)));
+	const encoded = $derived(encode(settings, name_of(source, base), settings.morph ? 0 : progress));
 	const PRESET_NAMES = Object.keys(PRESETS) as Preset[];
 
 	// Within NEAR px of the controls they're opaque; by FAR px away they've faded out.
@@ -117,12 +121,9 @@
 		return with_contrast(with_drift(kernel, settings.drift), settings.contrast);
 	}
 
-	/**
-	 * The kernel as the URL names it.
-	 * @param frozen Whether a crossfade is held partway, so the kernel is no seed's but a blend.
-	 */
-	function name_of(from: Source, kernel: Kernel, frozen: boolean): KernelName {
-		return from.kind === "seed" && !frozen ? from.seed : from.kind === "preset" ? from.name : kernel;
+	/** The kernel as the URL names it; a held crossfade's progress goes beside it. */
+	function name_of(from: Source, kernel: Kernel): KernelName {
+		return from.kind === "seed" ? from.seed : from.kind === "preset" ? from.name : kernel;
 	}
 
 	/** When sync() last ran, in performance.now() milliseconds. */
@@ -133,10 +134,10 @@
 	/** Copies the kernels' state to the page's. */
 	function sync(): void {
 		synced_at = performance.now();
-		source  = kernels.source;
-		base    = kernels.kernel;
+		source   = kernels.source;
+		base     = kernels.kernel;
 		progress = kernels.progress;
-		next_in = Math.ceil((1 - kernels.progress) * settings.morph_steps);
+		next_in  = Math.ceil((1 - kernels.progress) * settings.morph_steps);
 		if (source.kind === "seed") {
 			last_seed = source.seed;
 		}
@@ -156,16 +157,23 @@
 		steps++;
 	}
 
-	/** Jumps to the random kernel numbered `to`, wrapping around past either end. */
-	function jump(to: number): void {
-		kernels.jump(to >>> 0);
+	/**
+	 * Jumps to the random kernel numbered `to`, wrapping around past either end.
+	 * @param along How far its crossfade has gone already, from 0 up to 1.
+	 */
+	function jump(to: number, along = 0): void {
+		kernels.jump(to >>> 0, along);
 		sync();
 	}
 
-	/** A kernel as it was, for undo: where it came from, and the drift and contrast it was shown with. */
+	/**
+	 * A kernel as it was, for undo: where it came from, how far a random one's crossfade had gone,
+	 * and the drift and contrast it was shown with.
+	 */
 	interface KernelState {
 		source: Source;
 		kernel: Kernel;
+		progress: number;
 		contrast: number;
 		drift: number;
 	}
@@ -179,7 +187,7 @@
 	const UNDOS = 100;
 
 	function now_state(): KernelState {
-		return { source: kernels.source, kernel: kernels.kernel, contrast: settings.contrast, drift: settings.drift };
+		return { source: kernels.source, kernel: kernels.kernel, progress: kernels.progress, contrast: settings.contrast, drift: settings.drift };
 	}
 
 	/** Remembers the kernel before a change, for undo. */
@@ -193,10 +201,10 @@
 		can_redo = false;
 	}
 
-	/** Goes back to a remembered kernel; a random one starts its crossfade again. */
+	/** Goes back to a remembered kernel, a random one partway through its crossfade as it was. */
 	function restore(state: KernelState): void {
 		if (state.source.kind === "seed") {
-			kernels.jump(state.source.seed);
+			kernels.jump(state.source.seed, state.progress);
 		} else if (state.source.kind === "preset") {
 			kernels.choose(state.source.name);
 		} else {
@@ -233,8 +241,8 @@
 	}
 
 	/** Makes `kernel` the kernel, made from the one shown, so without drift or contrast of its own. */
-	function take(kernel: Kernel): void {
-		kernels.edit(kernel);
+	function take(kernel: Kernel, dragging = false): void {
+		kernels.edit(kernel, dragging);
 		settings.contrast = 1;
 		settings.drift    = 1;
 		sync();
@@ -246,7 +254,7 @@
 
 	/** Sets a dragged weight of the kernel shown, moving its group's weights as much. */
 	function edit_weight(index: number, weight: number): void {
-		take(with_delta(shown, group_of(index, group), weight - shown[index]!, balance));
+		take(with_delta(shown, group_of(index, group), weight - shown[index]!, balance), true);
 	}
 
 	function transform(name: Transform): void {
@@ -260,15 +268,19 @@
 	}
 
 	/**
-	 * Makes a kernel that grows stripes of `fx`, `fy` cycles per pixel, half again each step, unless
-	 * the taps see them as flat.
+	 * Makes a kernel that grows stripes of `fx`, `fy` cycles per pixel half again each step, with the
+	 * taps as they are, unless that takes huge weights.
+	 * @returns Whether it did.
 	 */
-	function grow(fx: number, fy: number): void {
-		const kernel = growing(fx, fy, settings.spacing, 1.5);
-		if (kernel !== null) {
-			remember();
-			take(kernel);
+	function grow(fx: number, fy: number): boolean {
+		const kernel = growing(fx, fy, { spacing: settings.spacing, jitter: settings.jitter, persistence: settings.persistence }, 1.5);
+		if (kernel === null) {
+			log.info("no kernel with small weights grows stripes of {fx}, {fy} cycles per pixel", { fx, fy });
+			return false;
 		}
+		remember();
+		take(kernel);
+		return true;
 	}
 
 	/** A random kernel number, small enough to read. */
@@ -304,15 +316,14 @@
 		if (named === null) {
 			jump(random_seed()); // Not new_kernel(): there's nothing to undo back to
 		} else if (typeof named === "number") {
-			jump(named);
+			jump(named, decoded.progress);
 		} else if (typeof named === "string") {
 			kernels.choose(named);
 		} else {
 			kernels.edit(named);
 		}
 		sync();
-		// The restart effect starts it, now that the settings above changed.
-		sim = new Simulation(canvas);
+		sim = new Simulation(canvas); // Which the restart effect starts
 		// A lost WebGL context loses the buffers, so it restarts.
 		canvas.addEventListener("webglcontextrestored", () => restart());
 
@@ -438,6 +449,8 @@
 
 	function toggle_pause(): void {
 		paused = !paused;
+		// Shows the kernel as it is, which may be up to SYNC_MS behind while running.
+		sync();
 	}
 
 	/** Space pauses, Enter steps, and Z and shift-Z undo and redo, except where they already mean something. */
@@ -600,7 +613,7 @@
 						<span>Spacing</span>
 						<input type="range" min="0" max={SLIDERS.spacing.positions} value={position_of(SLIDERS.spacing, settings.spacing)} oninput={(e) => slide("spacing", e)}
 							aria-valuetext="{settings.spacing} px" />
-						<output>{settings.spacing.toFixed(1)} px</output>
+						<output>{settings.spacing.toFixed(settings.spacing < 1 ? 2 : 1)} px</output>
 					</label>
 					<label class="row">
 						<span>Jitter</span>
@@ -758,7 +771,7 @@
 		touch-action: none;
 	}
 
-	/* The corner button and the card under it, which fade together as the pointer leaves them.
+	/* The corner buttons and the card under them, which fade together as the pointer leaves them.
 	   Keyboard focus keeps them up. The card scrolls if the window is short. */
 	.chrome {
 		position: fixed;

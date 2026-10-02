@@ -28,7 +28,7 @@
 
 	/** The top left of tap `i`'s cell: row 0 of a kernel is the bottom row. */
 	function cell(i: number): { x: number; y: number } {
-		return { x: (i % 5) * CELL, y: (4 - Math.floor(i / 5)) * CELL };
+		return { x: (tap_offset(i).x + 2) * CELL, y: (2 - tap_offset(i).y) * CELL };
 	}
 
 	/** A weight of 1 or more fills its cell, less fills less, by area. */
@@ -61,7 +61,7 @@
 </script>
 
 <figure>
-	<div class="title">Hinton diagram</div>
+	<div class="figure-title">Hinton diagram</div>
 	<svg viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} role="img" aria-label="The kernel's 25 weights"
 		onpointermove={move} onpointerup={end} onpointercancel={end} onpointerleave={() => drag === null && (active = null)}>
 		{#each { length: TAPS } as _, i (i)}
@@ -114,15 +114,6 @@
 		fill: none;
 		stroke: var(--text);
 		stroke-width: 1.5;
-	}
-	.title {
-		text-align: center;
-		font-size: 10px;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: var(--text-muted);
-		white-space: nowrap;
-		margin-bottom: 2px;
 	}
 	figcaption {
 		font-size: 11px;
