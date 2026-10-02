@@ -33,12 +33,15 @@
 
 	/** The tap pointed at, if any. */
 	let hover    = $state<number | null>(null);
-	/** The tap clicked, if any, which the caption shows a field for. */
+	/** The tap clicked, if any, which the caption shows a field for; never the middle, which follows the others. */
 	let selected = $state<number | null>(null);
 	/** The tap being dragged, if any. */
 	let dragged  = $state<number | null>(null);
-	/** Text typed into the field and not yet taken, if any, and the tap it's for. */
-	let typed    = $state<{ index: number; text: string } | null>(null);
+	/**
+	 * The field's text while it has focus, held still so a morphing kernel doesn't rewrite what's
+	 * about to be typed over, and whether it's been typed in since.
+	 */
+	let draft    = $state<{ text: string; typed: boolean } | null>(null);
 	let field    = $state<HTMLInputElement>();
 	/**
 	 * The tap pressed while the pointer's down, and where; once it's moved far enough to be a drag,
@@ -68,7 +71,7 @@
 
 	/** Presses tap `index`, first taking what's typed, as leaving the field would. */
 	function down(event: PointerEvent, index: number): void {
-		take_typed();
+		take_draft();
 		event.preventDefault();
 		(event.currentTarget as Element).closest("svg")!.setPointerCapture(event.pointerId);
 		press = { index, y: event.clientY, from: null };
@@ -85,7 +88,6 @@
 			}
 			press.y    = event.clientY;
 			press.from = kernel;
-			typed      = null;
 			selected   = null;
 			dragged    = press.index;
 			onstart();
@@ -94,13 +96,17 @@
 		onedit(reweighted(press.from, group_of(press.index, group), (k) => k + delta), true);
 	}
 
-	/** Ends a press; one that didn't drag was a click, which selects its tap or, if it was already, unselects it. */
+	/**
+	 * Ends a press; one that didn't drag was a click, which selects its tap or, if it already was or
+	 * it's the middle, unselects it.
+	 */
 	function up(event: PointerEvent): void {
 		if (press !== null && press.from === null) {
-			typed    = null;
-			selected = selected === press.index ? null : press.index;
+			draft    = null;
+			selected = selected === press.index || press.index === MIDDLE ? null : press.index;
 			// On a touchscreen, focus would put up a keyboard over the screen.
-			if (event.pointerType === "mouse") {
+			if (event.pointerType === "mouse" && selected !== null) {
+				hold();
 				void tick().then(() => field?.select());
 			}
 		}
@@ -113,26 +119,46 @@
 		dragged = null;
 	}
 
+	/** Holds the field's text still, at the selected tap's weight. */
+	function hold(): void {
+		draft = selected === null ? null : { text: kernel[selected]!.toFixed(3), typed: false };
+	}
+
 	/**
-	 * Gives the tap typed for, and its group, the weight typed, up to MOST either way. The field
-	 * goes back to the tap's weight, so a typo that isn't a number is dropped.
+	 * Gives the selected tap, and its group, the weight typed into the field, up to MOST either way,
+	 * if it's a number and changes any of them.
 	 */
-	function take_typed(): void {
-		if (typed === null) {
+	function take_draft(): void {
+		if (draft === null || !draft.typed || selected === null) {
 			return;
 		}
-		const weight = Number.parseFloat(typed.text);
-		const taps   = group_of(typed.index, group);
-		typed = null;
-		if (Number.isFinite(weight)) {
+		const weight = Number.parseFloat(draft.text);
+		draft = null;
+		if (!Number.isFinite(weight)) {
+			return;
+		}
+		const value = Math.max(-MOST, Math.min(MOST, weight));
+		const taps  = group_of(selected, group);
+		if (taps.some((i) => kernel[i] !== value)) {
 			onstart();
-			onedit(reweighted(kernel, taps, () => Math.max(-MOST, Math.min(MOST, weight))), false);
+			onedit(reweighted(kernel, taps, () => value), false);
 		}
 	}
 
+	/** Leaving the field takes what's typed, and lets it follow the kernel again. */
+	function leave(): void {
+		take_draft();
+		draft = null;
+	}
+
+	/** Enter takes what's typed, and Escape drops it and closes the field. */
 	function on_field_key(event: KeyboardEvent): void {
-		if (event.key === "Escape") {
-			typed    = null;
+		if (event.key === "Enter") {
+			event.preventDefault();
+			take_draft();
+			hold();
+		} else if (event.key === "Escape") {
+			draft    = null;
 			selected = null;
 		}
 	}
@@ -157,10 +183,11 @@
 		<div class="line">
 			{#if subject === null}
 				Drag or click to edit.
-			{:else if subject === selected && subject !== MIDDLE}
+			{:else if subject === selected}
 				{offset(subject)}
-				<input bind:this={field} type="number" step="0.01" min={-MOST} max={MOST} value={typed?.text ?? kernel[subject]!.toFixed(3)}
-					oninput={(e) => (typed = { index: subject, text: e.currentTarget.value })} onchange={take_typed} onkeydown={on_field_key} aria-label="Weight of tap {offset(subject)}" />
+				<input bind:this={field} type="number" step="0.001" min={-MOST} max={MOST} value={draft?.text ?? kernel[subject]!.toFixed(3)}
+					onfocus={hold} oninput={(e) => (draft = { text: e.currentTarget.value, typed: true })} onblur={leave} onkeydown={on_field_key}
+					aria-label="Weight of tap {offset(subject)}" />
 			{:else}
 				{offset(subject)}: {kernel[subject]!.toFixed(3)}
 			{/if}
@@ -208,13 +235,13 @@
 		color: var(--text-muted);
 		font-variant-numeric: tabular-nums;
 	}
-	/* Tall enough for the field, so the lines don't move as it comes and goes. */
+	/* Tall enough for the field, so the lines don't move as it comes and goes. Not clipped, so
+	   neither is the field's focus ring. */
 	.line {
 		display: flex;
 		align-items: center;
 		height: 17px;
 		white-space: nowrap;
-		overflow: hidden;
 	}
 	.accent {
 		color: var(--accent);

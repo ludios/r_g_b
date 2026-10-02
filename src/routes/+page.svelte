@@ -516,7 +516,7 @@
 
 	{#if show_card}
 		<section class="card">
-			<form onsubmit={(e) => e.preventDefault()}>
+			<form novalidate onsubmit={(e) => e.preventDefault()}>
 				<details class="section" bind:open={open.kernel}>
 					<summary>Kernel</summary>
 					<div class="row">
