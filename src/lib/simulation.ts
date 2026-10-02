@@ -3,19 +3,19 @@
 // The simulation on the GPU: ping-pong buffers, the step shader, and drawing to the canvas.
 import * as THREE from "three";
 import type { Kernel } from "./kernel";
-import { type Precision, type Seeds, VIEWS, type View } from "./settings";
+import { type BitDepth, type Seeds, VIEWS, type View } from "./settings";
 import screen_shader from "./screen.frag?raw";
 import sim_shader from "./sim.frag?raw";
 
 /** How far a planted wave's stripes swing from the ground. */
 const WAVE = 0.05;
 
-/** What a buffer's texels are, for each precision. */
+/** What a buffer's texels are, for each bit depth. */
 const TEXEL_TYPES = {
 	8:  THREE.UnsignedByteType,
 	16: THREE.HalfFloatType,
 	32: THREE.FloatType,
-} as const satisfies Record<Precision, THREE.TextureDataType>;
+} as const satisfies Record<BitDepth, THREE.TextureDataType>;
 
 /** What a restart starts from. */
 export interface StartSettings {
@@ -28,7 +28,7 @@ export interface StartSettings {
 	noise: number;
 	seeds: Seeds;
 	/** Bits per channel of the buffers. */
-	precision: Precision;
+	bit_depth: BitDepth;
 	/** Faint stripes to start with, in cycles per pixel across and up, if any. */
 	wave?: { fx: number; fy: number };
 }
@@ -132,10 +132,10 @@ export class Simulation {
 	}
 
 	/** A buffer for restart() to size. */
-	static #target(precision: Precision): THREE.WebGLRenderTarget {
+	static #target(bit_depth: BitDepth): THREE.WebGLRenderTarget {
 		// The step reads whole texels itself; showing a buffer on the canvas never blends them.
 		return new THREE.WebGLRenderTarget(1, 1, {
-			type:          TEXEL_TYPES[precision],
+			type:          TEXEL_TYPES[bit_depth],
 			minFilter:     THREE.NearestFilter,
 			magFilter:     THREE.NearestFilter,
 			depthBuffer:   false,
@@ -159,9 +159,9 @@ export class Simulation {
 		// Freed here (along with anything left from a lost context); reallocated on first use.
 		this.#current.dispose();
 		this.#next.dispose();
-		if (this.#current.texture.type !== TEXEL_TYPES[start.precision]) {
-			this.#current = Simulation.#target(start.precision);
-			this.#next    = Simulation.#target(start.precision);
+		if (this.#current.texture.type !== TEXEL_TYPES[start.bit_depth]) {
+			this.#current = Simulation.#target(start.bit_depth);
+			this.#next    = Simulation.#target(start.bit_depth);
 		}
 		this.#current.setSize(width, height);
 		this.#next.setSize(width, height);

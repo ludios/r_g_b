@@ -3,7 +3,7 @@ import { assert, boolean, constantFrom, double, integer, property, record, strin
 import { describe, expect, test } from "vitest";
 import { decode, encode } from "./codec";
 import { MAX_SEED, PRESETS, with_delta } from "./kernel";
-import { CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, PIXEL_SIZES, PRECISIONS, SEEDS, SLIDERS, VIEWS } from "./settings";
+import { BIT_DEPTHS, CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, PIXEL_SIZES, SEEDS, SLIDERS, VIEWS } from "./settings";
 
 // Adding 0 makes -0 a plain 0, which is what the URL can say.
 const slider = (key: keyof typeof SLIDERS) => double({ min: SLIDERS[key].min, max: SLIDERS[key].max, noNaN: true }).map((v) => v + 0);
@@ -21,7 +21,7 @@ const settings = record({
 	ground:      slider("ground"),
 	noise:       slider("noise"),
 	pixel:       constantFrom(...PIXEL_SIZES),
-	precision:   constantFrom(...PRECISIONS),
+	bit_depth:   constantFrom(...BIT_DEPTHS),
 	view:        constantFrom(...VIEWS),
 	mouse_x:     constantFrom(null, ...MOUSE_TARGETS),
 	mouse_y:     constantFrom(null, ...MOUSE_TARGETS),

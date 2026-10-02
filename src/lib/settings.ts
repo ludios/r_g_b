@@ -44,8 +44,8 @@ export const PIXEL_SIZES = [1, 2, 4, 8] as const;
  * A step's change smaller than half a rounding is lost, so a blur stops before it's flat, and the
  * finer the rounding, the flatter it gets first.
  */
-export const PRECISIONS = [8, 16, 32] as const;
-export type Precision = (typeof PRECISIONS)[number];
+export const BIT_DEPTHS = [8, 16, 32] as const;
+export type BitDepth = (typeof BIT_DEPTHS)[number];
 
 export interface Settings {
 	/** Scales each kernel weight's deviation from flat; 1 is the kernel as generated. */
@@ -75,7 +75,7 @@ export interface Settings {
 	noise: number;
 	/** One of PIXEL_SIZES. */
 	pixel: number;
-	precision: Precision;
+	bit_depth: BitDepth;
 	/** How the canvas shows each frame. */
 	view: View;
 	/** What follows the pointer across the window, or nothing. */
@@ -102,7 +102,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	ground:      0.05,
 	noise:       0,
 	pixel:       1,
-	precision:   8,
+	bit_depth:   8,
 	view:        "color",
 	mouse_x:     "r_g_b",
 	mouse_y:     "r_g_b",

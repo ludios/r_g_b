@@ -4,7 +4,7 @@
 // defaults is written. Reading is forgiving: anything missing or unreadable is the default, and
 // numbers past a slider's end are that end.
 import { type Kernel, MAX_SEED, PRESETS, type Preset, TAPS } from "./kernel";
-import { CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, PRECISIONS, SEEDS, SLIDERS, type Settings, VIEWS } from "./settings";
+import { CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, type MouseTarget, BIT_DEPTHS, PIXEL_SIZES, SEEDS, SLIDERS, type Settings, VIEWS } from "./settings";
 
 /** The query string's key for each setting; "k" is a random kernel's seed or a preset, "w" weights. */
 const KEYS = {
@@ -21,7 +21,7 @@ const KEYS = {
 	ground:      "g",
 	noise:       "n",
 	pixel:       "px",
-	precision:   "pr",
+	bit_depth:   "bd",
 	view:        "vw",
 	mouse_x:     "mx",
 	mouse_y:     "my",
@@ -110,7 +110,7 @@ export function decode(query: string): Decoded {
 			ground:      number("ground"),
 			noise:       number("noise"),
 			pixel:       choice("pixel", PIXEL_SIZES, d.pixel),
-			precision:   choice("precision", PRECISIONS, d.precision),
+			bit_depth:   choice("bit_depth", BIT_DEPTHS, d.bit_depth),
 			view:        choice("view", VIEWS, d.view),
 			mouse_x:     target("mouse_x"),
 			mouse_y:     target("mouse_y"),
