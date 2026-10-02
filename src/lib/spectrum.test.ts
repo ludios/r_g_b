@@ -28,16 +28,22 @@ function step(model: StepModel, image: number[][]): number[][] {
 	}));
 }
 
+/** A step of `kernel` with taps 1 pixel apart, and no jitter or persistence. */
+function unit(kernel: Kernel): StepModel {
+	return { kernel, spacing: 1, jitter: 0, persistence: 0 };
+}
+
 /**
- * The most a step of `kernel`, with taps 1 pixel apart and no jitter, grows stripes of any width
- * whose waves run `degrees` counterclockwise from across.
+ * The most a step of unit(kernel) grows stripes whose waves run `degrees` counterclockwise from
+ * across, of any width pixels can show: out to half a cycle per pixel across or up.
  */
 function fastest_along(kernel: Kernel, degrees: number): number {
 	const angle = (degrees * Math.PI) / 180;
+	const reach = 0.5 / Math.max(Math.abs(Math.cos(angle)), Math.abs(Math.sin(angle)));
 	let most = 0;
 	for (let i = 1; i <= 500; i++) {
-		const f = i / 1000;
-		most = Math.max(most, multiplier({ kernel, spacing: 1, jitter: 0, persistence: 0 }, f * Math.cos(angle), f * Math.sin(angle)).growth);
+		const f = (i / 500) * reach;
+		most = Math.max(most, multiplier(unit(kernel), f * Math.cos(angle), f * Math.sin(angle)).growth);
 	}
 	return most;
 }
@@ -154,7 +160,9 @@ describe("motion", () => {
 
 describe("presets", () => {
 	test("the ring grows upright and level stripes fastest; the circles grow them alike at any angle", () => {
-		expect(fastest_along(PRESETS.ring, 0)).toBeGreaterThan(1.2 * fastest_along(PRESETS.ring, 45));
+		const ring = fastest(growth_map(unit(PRESETS.ring), 101))!;
+		expect(Math.min(Math.abs(ring.fx), Math.abs(ring.fy))).toBe(0);
+		expect(fastest_along(PRESETS.ring, 0)).toBeGreaterThan(1.15 * fastest_along(PRESETS.ring, 45));
 		const level = fastest_along(PRESETS.circles, 0);
 		expect(level).toBeGreaterThan(2);
 		for (let degrees = 5; degrees <= 45; degrees += 5) {
@@ -163,23 +171,22 @@ describe("presets", () => {
 	});
 
 	test("the hexagons grow stripes fastest in three directions about 60 degrees apart", () => {
-		const model = { kernel: PRESETS.hexagons, spacing: 1, jitter: 0, persistence: 0 };
-		// Across, and 56 degrees either side of up, all six taps land a third of a cycle along the
-		// wave either way, at -1/2: as low as they can all be at once.
+		// Across, and 56 degrees either side of it, all six taps land a third of a cycle along the
+		// wave either way, at -1/2: as low as they can all be at once, so nothing grows faster.
 		for (const [fx, fy] of [[1 / 3, 0], [1 / 6, 1 / 4], [-1 / 6, 1 / 4]] as const) {
-			expect(multiplier(model, fx, fy).growth).toBeCloseTo(1.45, 12);
+			expect(multiplier(unit(PRESETS.hexagons), fx, fy).growth).toBeCloseTo(1.45, 12);
 		}
+		expect(fastest(growth_map(unit(PRESETS.hexagons), 101))!.growth).toBeLessThan(1.45 + 1e-9);
 		for (const degrees of [28, 90, 152]) {
 			expect(fastest_along(PRESETS.hexagons, degrees)).toBeLessThan(1.41);
 		}
 	});
 
 	test("rise grows stripes as the row does, whatever their slant, and moves everything up a tap a step", () => {
-		const model = { kernel: PRESETS.rise, spacing: 1, jitter: 0, persistence: 0 };
 		for (const fy of [-0.3, 0, 0.1, 0.25]) {
-			expect(multiplier(model, 1 / 6, fy).growth).toBeCloseTo(1.25, 12);
+			expect(multiplier(unit(PRESETS.rise), 1 / 6, fy).growth).toBeCloseTo(1.25, 12);
 			// cos(2 pi fy y - 2 pi fy) is the level stripes cos(2 pi fy y) a tap higher.
-			expect(multiplier(model, 0, fy).phase).toBeCloseTo(-2 * Math.PI * fy, 12);
+			expect(multiplier(unit(PRESETS.rise), 0, fy).phase).toBeCloseTo(-2 * Math.PI * fy, 12);
 		}
 	});
 
@@ -194,6 +201,6 @@ describe("presets", () => {
 		expect(fastest_along(PRESETS.emboss, 135)).toBeGreaterThan(7);
 		expect(fastest_along(PRESETS.emboss, 45)).toBeCloseTo(1, 12);
 		// Waves running up and left come out of a step behind where they were: moved along.
-		expect(multiplier({ kernel: PRESETS.emboss, spacing: 1, jitter: 0, persistence: 0 }, -0.15, 0.15).phase).toBeLessThan(0);
+		expect(multiplier(unit(PRESETS.emboss), -0.15, 0.15).phase).toBeLessThan(0);
 	});
 });
