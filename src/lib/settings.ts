@@ -4,9 +4,9 @@
 import { A } from "ayy";
 
 /** The settings a slider controls that the mouse can be given too. */
-export type Param = "contrast" | "spacing" | "jitter" | "persistence";
+export type Param = "contrast" | "drift" | "spacing" | "jitter" | "persistence";
 
-export const PARAMS: readonly Param[] = ["contrast", "spacing", "jitter", "persistence"];
+export const PARAMS: readonly Param[] = ["contrast", "drift", "spacing", "jitter", "persistence"];
 
 /**
  * Ways to show a frame: in color; one channel alone, in gray; how much each channel changed in
@@ -28,6 +28,8 @@ export const PIXEL_SIZES = [1, 2, 4, 8] as const;
 export interface Settings {
 	/** Scales each kernel weight's deviation from flat; 1 is the kernel as generated. */
 	contrast: number;
+	/** Scales the kernel's lopsided part, which moves the stripes; 1 is the kernel as it is. */
+	drift: number;
 	/** Whether the kernel crossfades into a new one, over `morph_steps` steps each. */
 	morph: boolean;
 	morph_steps: number;
@@ -59,6 +61,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
 	contrast:    2.3,
+	drift:       1,
 	morph:       true,
 	morph_steps: 3600,
 	spacing:     10,
@@ -89,6 +92,7 @@ export interface Slider {
 
 export const SLIDERS = {
 	contrast:    { min: 0,      max: 4,     scale: "linear", positions: 200 },
+	drift:       { min: -2,     max: 2,     scale: "linear", positions: 200 },
 	morph_steps: { min: 60,     max: 36000, scale: "log",    positions: 120, integer: true },
 	spacing:     { min: 1,      max: 256,   scale: "log",    positions: 240 },
 	jitter:      { min: 0,      max: 0.25,  scale: "linear", positions: 100 },

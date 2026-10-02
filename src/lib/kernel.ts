@@ -1,6 +1,7 @@
 // Model-output: Claude Opus 5.5
 
-// The 5x5 kernels the simulation convolves with: random ones, and the crossfade between them.
+// The 5x5 kernels the simulation convolves with: random ones and the crossfade between them,
+// presets, and the transformations the controls apply.
 import { getLogger } from "@logtape/logtape";
 import { A } from "ayy";
 
@@ -19,6 +20,29 @@ export const TAPS = 25;
 
 /** The weight of every tap of a flat kernel, which blurs evenly. */
 export const FLAT = 1 / TAPS;
+
+/** The kernel with weight `weight(x, y)` at each tap, x and y from -2 to 2 (up is +y). */
+function kernel_of(weight: (x: number, y: number) => number): Kernel {
+	return Array.from({ length: TAPS }, (_, i) => weight((i % 5) - 2, Math.floor(i / 5) - 2));
+}
+
+/** Kernels that each show one behavior, by name. */
+export const PRESETS = {
+	/** Every pixel stays as it is. */
+	identity: kernel_of((x, y) => Number(x === 0 && y === 0)),
+	/** An even blur, under which everything fades to flat. */
+	box:      kernel_of(() => FLAT),
+	/** Every pixel takes the value one tap to its right, so the image moves left. */
+	shift:    kernel_of((x, y) => Number(x === 1 && y === 0)),
+	/** Only the middle row: stripes 6 taps apart grow along it; up and down, nothing is chosen. */
+	row:      kernel_of((x, y) => (y === 0 ? [-0.25, 0.5, 0.5, 0.5, -0.25][x + 2]! : 0)),
+	/** Positive middle, negative edge: stripes about 4.5 taps apart grow, at any angle. */
+	ring:     kernel_of((x, y) => ({ 0: 0.76, 1: 0.35, 2: 0.12, 4: -0.075, 5: -0.11, 8: -0.115 })[x * x + y * y] ?? 0),
+	/** Negative middle, positive neighbors: a checkerboard of taps doubles and inverts every step. */
+	checker:  kernel_of((x, y) => (x === 0 && y === 0 ? -0.5 : Math.abs(x) + Math.abs(y) === 1 ? 0.375 : 0)),
+} satisfies Record<string, Kernel>;
+
+export type Preset = keyof typeof PRESETS;
 
 /** A standard normal deviate, by Box-Muller. */
 function random_normal(random: () => number): number {
@@ -98,30 +122,62 @@ export function with_contrast(kernel: Kernel, gain: number): Kernel {
 	return kernel.map(k => (k - FLAT) * gain + FLAT);
 }
 
+/**
+ * Scales the kernel's lopsided part by `drift`, keeping the sum at 1. A kernel is a symmetric
+ * part, which decides which stripes grow, and a part that's the negative of itself turned half a
+ * turn, which moves them; so 0 makes stripes stand still or invert each step, and -1 turns the
+ * kernel half a turn, reversing the motion.
+ */
+export function with_drift(kernel: Kernel, drift: number): Kernel {
+	// Half a turn about the middle tap reverses the row-major order.
+	return kernel.map((k, i) => {
+		const turned = kernel[TAPS - 1 - i]!;
+		return (k + turned) / 2 + drift * (k - turned) / 2;
+	});
+}
+
+/**
+ * The kernel with weight `index` set to `weight`, and the difference taken evenly from the
+ * others, so the sum stays.
+ */
+export function with_weight(kernel: Kernel, index: number, weight: number): Kernel {
+	A.gte(index, 0);
+	A.lt(index, TAPS);
+	const spread = (weight - kernel[index]!) / (TAPS - 1);
+	return kernel.map((k, i) => (i === index ? weight : k - spread));
+}
+
 /** Maps [0, 1] onto [0, 1] along half a cosine, so it starts and ends slowly. */
 function ease_in_out_sine(x: number): number {
 	return -(Math.cos(Math.PI * x) - 1) / 2;
 }
 
 /**
- * The kernel morphing through the random kernels in seed order, one simulation step at a time,
- * so pausing holds it: each crossfades into the next, easing in and out.
+ * Where the kernel comes from: a random kernel, which morphs into the next seed's; a preset; or
+ * weights edited by hand.
  */
-export class KernelMorph {
-	#seed = 0;
+export type Source = { kind: "seed"; seed: number } | { kind: "preset"; name: Preset } | { kind: "edited" };
+
+/**
+ * The kernel and where it comes from. A random one morphs through the random kernels in seed
+ * order, one simulation step at a time, so pausing holds it: each crossfades into the next,
+ * easing in and out.
+ */
+export class Kernels {
+	#source: Source = { kind: "seed", seed: 0 };
 	#from: Kernel = [];
+	/** The next seed's kernel while the source is a seed, otherwise the same as #from. */
 	#to: Kernel = [];
 	/** How far the crossfade has gone, from 0 up to 1. */
 	#progress = 0;
 
-	/** @param seed The kernel to start from, fading toward the next. */
+	/** @param seed The random kernel to start from. */
 	constructor(seed: number) {
 		this.jump(seed);
 	}
 
-	/** The seed of the kernel the crossfade started from; it's fading toward the next seed's. */
-	get seed(): number {
-		return this.#seed;
+	get source(): Source {
+		return this.#source;
 	}
 
 	/** How far the crossfade has gone, from 0 up to 1. */
@@ -129,35 +185,57 @@ export class KernelMorph {
 		return this.#progress;
 	}
 
-	/** The crossfaded kernel. */
+	/** The kernel, crossfaded if it's morphing. */
 	get kernel(): Kernel {
 		const t = ease_in_out_sine(this.#progress);
 		return this.#to.map((k, i) => k * t + this.#from[i]! * (1 - t));
 	}
 
-	/** Jumps to the kernel numbered `seed`, fading toward the next. */
+	/** Jumps to the random kernel numbered `seed`, fading toward the next. */
 	jump(seed: number): void {
-		this.#seed = seed;
+		this.#source = { kind: "seed", seed };
 		this.#from = seeded_kernel(seed);
 		this.#to = seeded_kernel(next_seed(seed));
 		this.#progress = 0;
 		log.info("kernel {seed}", { seed });
 	}
 
+	choose(name: Preset): void {
+		this.#set({ kind: "preset", name }, PRESETS[name]);
+	}
+
+	/** Takes weights edited by hand. */
+	edit(kernel: Kernel): void {
+		this.#set({ kind: "edited" }, kernel);
+		log.info("edited kernel {kernel}", { kernel: JSON.stringify(kernel) });
+	}
+
 	/**
-	 * Moves the crossfade on by one step; once it's done, the next begins.
+	 * Moves a random kernel's crossfade on by one step; once it's done, the next begins.
 	 * @param steps How many steps a whole crossfade takes, at this rate.
 	 */
 	advance(steps: number): void {
 		A.gte(steps, 1);
+		if (this.#source.kind !== "seed") {
+			return;
+		}
 		this.#progress += 1 / steps;
 		// Ten tenths add up to just under 1.
 		if (this.#progress > 1 - 1e-9) {
-			this.#seed = next_seed(this.#seed);
+			const seed = next_seed(this.#source.seed);
+			this.#source = { kind: "seed", seed };
 			this.#from = this.#to;
-			this.#to = seeded_kernel(next_seed(this.#seed));
+			this.#to = seeded_kernel(next_seed(seed));
 			this.#progress = 0;
-			log.info("kernel {seed}", { seed: this.#seed });
+			log.info("kernel {seed}", { seed });
 		}
+	}
+
+	#set(source: Source, kernel: Kernel): void {
+		A.eq(kernel.length, TAPS);
+		this.#source = source;
+		this.#from = kernel;
+		this.#to = kernel;
+		this.#progress = 0;
 	}
 }

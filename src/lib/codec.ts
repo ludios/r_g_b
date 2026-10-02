@@ -1,14 +1,15 @@
 // Model-output: Claude Opus 5.5
 
-// The settings and the kernel's seed as a query string, for the address bar. Only what differs
-// from the defaults is written. Reading is forgiving: anything missing or unreadable is the
-// default, and numbers past a slider's end are that end.
-import { MAX_SEED } from "./kernel";
+// The settings and the kernel as a query string, for the address bar. Only what differs from the
+// defaults is written. Reading is forgiving: anything missing or unreadable is the default, and
+// numbers past a slider's end are that end.
+import { type Kernel, MAX_SEED, PRESETS, type Preset, TAPS } from "./kernel";
 import { DEFAULT_SETTINGS, PARAMS, PIXEL_SIZES, type Param, SEEDS, SLIDERS, type Settings, VIEWS } from "./settings";
 
-/** The query string's key for each setting; "k" is the seed. */
+/** The query string's key for each setting; "k" is a random kernel's seed or a preset, "w" weights. */
 const KEYS = {
 	contrast:    "c",
+	drift:       "d",
 	morph:       "m",
 	morph_steps: "ms",
 	spacing:     "s",
@@ -26,15 +27,24 @@ const KEYS = {
 	mouse_y:     "my",
 } as const satisfies Record<keyof Settings, string>;
 
+/** A kernel as a URL names it: a random one by its seed, a preset, or weights. */
+export type KernelName = number | Preset | Kernel;
+
 /** What a URL describes: the settings, and the kernel to start from if it names one. */
 export interface Decoded {
 	settings: Settings;
-	seed: number | null;
+	kernel: KernelName | null;
 }
 
-/** Encodes the settings that differ from the defaults, and the seed, as `key=value&...`. */
-export function encode(settings: Settings, seed: number): string {
-	const q = new URLSearchParams({ k: String(seed) });
+/** Encodes the settings that differ from the defaults, and the kernel, as `key=value&...`. */
+export function encode(settings: Settings, kernel: KernelName): string {
+	const q = new URLSearchParams();
+	if (Array.isArray(kernel)) {
+		// Six decimals are plenty; decoding puts the sum back at exactly 1.
+		q.set("w", kernel.map((k) => Number(k.toFixed(6))).join(","));
+	} else {
+		q.set("k", String(kernel));
+	}
 	for (const key of Object.keys(KEYS) as (keyof Settings)[]) {
 		const value = settings[key];
 		if (value !== DEFAULT_SETTINGS[key]) {
@@ -70,10 +80,10 @@ export function decode(query: string): Decoded {
 		const raw = q.get(KEYS[key]);
 		return options.find((option) => String(option) === raw) ?? fallback;
 	};
-	const seed = Number(q.get("k") ?? NaN);
 	return {
 		settings: {
 			contrast:    number("contrast"),
+			drift:       number("drift"),
 			morph:       flag("morph"),
 			morph_steps: Math.round(number("morph_steps")),
 			spacing:     number("spacing"),
@@ -90,6 +100,22 @@ export function decode(query: string): Decoded {
 			mouse_x:     param("mouse_x"),
 			mouse_y:     param("mouse_y"),
 		},
-		seed: Number.isInteger(seed) && seed >= 0 && seed <= MAX_SEED ? seed : null,
+		kernel: decode_kernel(q),
 	};
+}
+
+/** The kernel `q` names, if any: weights in "w" win over "k". */
+function decode_kernel(q: URLSearchParams): KernelName | null {
+	const weights = (q.get("w") ?? "").split(",").map(Number);
+	if (weights.length === TAPS && weights.every(Number.isFinite)) {
+		// Any sum but 1 brightens or darkens flat areas, step after step.
+		const adjustment = (1 - weights.reduce((s, k) => s + k, 0)) / TAPS;
+		return weights.map((k) => k + adjustment);
+	}
+	const k = q.get("k");
+	if (k !== null && k in PRESETS) {
+		return k as Preset;
+	}
+	const seed = Number(k ?? NaN);
+	return Number.isInteger(seed) && seed >= 0 && seed <= MAX_SEED ? seed : null;
 }

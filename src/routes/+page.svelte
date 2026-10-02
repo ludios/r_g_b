@@ -2,8 +2,9 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { replaceState } from "$app/navigation";
-	import { decode, encode } from "$lib/codec";
-	import { KernelMorph, MAX_SEED, next_seed, with_contrast } from "$lib/kernel";
+	import KernelDiagram from "$lib/KernelDiagram.svelte";
+	import { type KernelName, decode, encode } from "$lib/codec";
+	import { type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, next_seed, with_contrast, with_drift, with_weight } from "$lib/kernel";
 	import { DEFAULT_SETTINGS, PARAMS, PIXEL_SIZES, type Param, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { local_storage } from "$lib/storage";
@@ -23,10 +24,16 @@
 	let chrome: HTMLElement;
 	let sim: Simulation | undefined;
 	// The page is prerendered with some kernel; the URL's, or a random one, takes over once mounted.
-	const morph = new KernelMorph(0);
-	/** The morph's seed, as reactive state. */
-	let seed    = $state(0);
-	const encoded = $derived(encode(settings, seed));
+	const kernels = new Kernels(0);
+	/** The kernels' source and kernel as reactive state, which sync() updates. */
+	let source    = $state<Source>(kernels.source);
+	let base      = $state<Kernel>(kernels.kernel);
+	/** The last random kernel, which choosing Random goes back to; the current one while random. */
+	let last_seed = 0;
+	/** The kernel the step uses: the base, with the drift and contrast applied. */
+	const shown   = $derived(shape(base));
+	const encoded = $derived(encode(settings, name_of(source, base)));
+	const PRESET_NAMES = Object.keys(PRESETS) as Preset[];
 
 	// Within NEAR px of the controls they're opaque; by FAR px away they've faded out.
 	const NEAR = 24;
@@ -65,12 +72,32 @@
 	// The settings of what a restart starts from restart it when they change.
 	$effect(restart);
 
+	/** The kernel with the drift and contrast settings applied. */
+	function shape(kernel: Kernel): Kernel {
+		return with_contrast(with_drift(kernel, settings.drift), settings.contrast);
+	}
+
+	/** The kernel as the URL names it. */
+	function name_of(from: Source, kernel: Kernel): KernelName {
+		return from.kind === "seed" ? from.seed : from.kind === "preset" ? from.name : kernel;
+	}
+
+	/** Copies the kernels' state to the page's. */
+	function sync(): void {
+		source  = kernels.source;
+		base    = kernels.kernel;
+		next_in = Math.ceil((1 - kernels.progress) * settings.morph_steps);
+		if (source.kind === "seed") {
+			last_seed = source.seed;
+		}
+	}
+
 	function step(): void {
 		if (settings.morph) {
-			morph.advance(settings.morph_steps);
+			kernels.advance(settings.morph_steps);
 		}
 		sim!.step({
-			kernel:      with_contrast(morph.kernel, settings.contrast),
+			kernel:      shape(kernels.kernel),
 			stamp:       settings.stamp,
 			tap_spacing: settings.spacing,
 			jitter:      settings.jitter,
@@ -79,10 +106,31 @@
 		steps++;
 	}
 
-	/** Jumps to the kernel numbered `to`, wrapping around past either end. */
+	/** Jumps to the random kernel numbered `to`, wrapping around past either end. */
 	function jump(to: number): void {
-		morph.jump(to >>> 0);
-		seed = morph.seed;
+		kernels.jump(to >>> 0);
+		sync();
+	}
+
+	/** Goes back to random kernels, or to a preset; a preset is shown as it is, without drift or contrast. */
+	function choose(choice: string): void {
+		const preset = PRESET_NAMES.find((name) => name === choice);
+		if (preset === undefined) {
+			jump(last_seed);
+			return;
+		}
+		kernels.choose(preset);
+		settings.contrast = 1;
+		settings.drift    = 1;
+		sync();
+	}
+
+	/** Sets a weight of the kernel as shown, which becomes the kernel, without drift or contrast. */
+	function edit_weight(index: number, weight: number): void {
+		kernels.edit(with_weight(shown, index, weight));
+		settings.contrast = 1;
+		settings.drift    = 1;
+		sync();
 	}
 
 	function new_kernel(): void {
@@ -95,22 +143,29 @@
 		if (Number.isInteger(typed) && typed >= 0 && typed <= MAX_SEED) {
 			jump(typed);
 		}
-		event.currentTarget.value = String(seed);
+		event.currentTarget.value = String(last_seed);
 	}
 
 	function step_once(): void {
 		step();
+		sync();
 		sim!.draw(settings.view);
 	}
 
 	onMount(() => {
 		const decoded = decode(location.search);
 		settings = decoded.settings;
-		if (decoded.seed === null) {
+		const named = decoded.kernel;
+		if (named === null) {
 			new_kernel();
+		} else if (typeof named === "number") {
+			jump(named);
+		} else if (typeof named === "string") {
+			kernels.choose(named);
 		} else {
-			jump(decoded.seed);
+			kernels.edit(named);
 		}
+		sync();
 		sim = new Simulation(canvas);
 		restart();
 		// A lost WebGL context loses the buffers, so it restarts.
@@ -121,15 +176,14 @@
 		/** Steps as many times as the speed asks for this display frame, then shows the result. */
 		function loop(): void {
 			frame_request = requestAnimationFrame(loop); // First, so an exception doesn't stop the loop
-			if (!paused) {
-				const count = settings.speed >= 1 ? settings.speed : Number(frame % Math.round(1 / settings.speed) === 0);
-				for (let i = 0; i < count; i++) {
-					step();
-				}
+			const count = paused ? 0 : settings.speed >= 1 ? settings.speed : Number(frame % Math.round(1 / settings.speed) === 0);
+			for (let i = 0; i < count; i++) {
+				step();
+			}
+			if (count > 0) {
+				sync();
 			}
 			frame++;
-			seed    = morph.seed;
-			next_in = Math.ceil((1 - morph.progress) * settings.morph_steps);
 			sim!.draw(settings.view);
 		}
 		loop();
@@ -197,7 +251,8 @@
 		return speed >= 1 ? `${speed} per frame` : `1 per ${Math.round(1 / speed)} frames`;
 	}
 
-	const PARAM_LABELS: Record<Param, string> = { contrast: "Contrast", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence" };
+	const PARAM_LABELS:  Record<Param, string>  = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence" };
+	const PRESET_LABELS: Record<Preset, string> = { identity: "Identity", box: "Box blur", shift: "Shift", row: "One row", ring: "Center-surround", checker: "Checkerboard" };
 	const SEED_LABELS:  Record<Seeds, string> = { rgb: "R G B dots", white: "White dot", pixel: "One pixel", none: "None" };
 	const VIEW_LABELS:  Record<View, string>  = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
@@ -227,28 +282,50 @@
 				<fieldset>
 					<legend>Kernel</legend>
 					<div class="row">
-						<span>Number</span>
-						<div class="seed">
-							<button type="button" onclick={() => jump(seed - 1)} aria-label="Previous kernel">‹</button>
-							<input type="number" min="0" max={MAX_SEED} step="1" value={seed} onchange={commit_seed} aria-label="Kernel number" />
-							<button type="button" onclick={() => jump(seed + 1)} aria-label="Next kernel">›</button>
+						<span>Kernel</span>
+						<select class="wide" value={source.kind === "seed" ? "random" : source.kind === "preset" ? source.name : "edited"} onchange={(e) => choose(e.currentTarget.value)}>
+							<option value="random">Random</option>
+							{#each PRESET_NAMES as name (name)}
+								<option value={name}>{PRESET_LABELS[name]}</option>
+							{/each}
+							{#if source.kind === "edited"}
+								<option value="edited" disabled>Edited</option>
+							{/if}
+						</select>
+					</div>
+					{#if source.kind === "seed"}
+						<div class="row">
+							<span>Number</span>
+							<div class="seed">
+								<button type="button" onclick={() => jump(last_seed - 1)} aria-label="Previous kernel">‹</button>
+								<input type="number" min="0" max={MAX_SEED} step="1" value={source.seed} onchange={commit_seed} aria-label="Kernel number" />
+								<button type="button" onclick={() => jump(last_seed + 1)} aria-label="Next kernel">›</button>
+							</div>
+							<output>{settings.morph ? `to ${next_seed(source.seed)}` : ""}</output>
 						</div>
-						<output>{settings.morph ? `to ${next_seed(seed)}` : ""}</output>
+						<div class="row">
+							<label class="check"><input type="checkbox" bind:checked={settings.morph} /> Morph</label>
+							<input type="range" min="0" max={SLIDERS.morph_steps.positions} value={position_of(SLIDERS.morph_steps, settings.morph_steps)} oninput={(e) => slide("morph_steps", e)}
+								disabled={!settings.morph} aria-label="Steps per kernel" aria-valuetext="{settings.morph_steps} steps" />
+							<output>{settings.morph_steps} steps</output>
+						</div>
+						{#if settings.morph}
+							<p class="muted">Next kernel in {next_in} steps.</p>
+						{/if}
+					{/if}
+					<div class="figures">
+						<KernelDiagram kernel={shown} onedit={edit_weight} />
 					</div>
 					<label class="row">
 						<span>Contrast</span>
 						<input type="range" min="0" max={SLIDERS.contrast.positions} value={position_of(SLIDERS.contrast, settings.contrast)} oninput={(e) => slide("contrast", e)} />
 						<output>{settings.contrast.toFixed(2)}×</output>
 					</label>
-					<div class="row">
-						<label class="check"><input type="checkbox" bind:checked={settings.morph} /> Morph</label>
-						<input type="range" min="0" max={SLIDERS.morph_steps.positions} value={position_of(SLIDERS.morph_steps, settings.morph_steps)} oninput={(e) => slide("morph_steps", e)}
-							disabled={!settings.morph} aria-label="Steps per kernel" aria-valuetext="{settings.morph_steps} steps" />
-						<output>{settings.morph_steps} steps</output>
-					</div>
-					{#if settings.morph}
-						<p class="muted">Next kernel in {next_in} steps.</p>
-					{/if}
+					<label class="row">
+						<span>Drift</span>
+						<input type="range" min="0" max={SLIDERS.drift.positions} value={position_of(SLIDERS.drift, settings.drift)} oninput={(e) => slide("drift", e)} />
+						<output>{settings.drift.toFixed(2)}×</output>
+					</label>
 				</fieldset>
 
 				<fieldset>
@@ -450,7 +527,7 @@
 
 	.row {
 		display: grid;
-		grid-template-columns: 6.5em 1fr 6.5em;
+		grid-template-columns: 6.5em minmax(0, 1fr) 6.5em;
 		gap: 10px;
 		align-items: center;
 		margin: 4px 0;
@@ -485,6 +562,18 @@
 	}
 	input[type="checkbox"] {
 		margin: 0;
+	}
+
+	.wide {
+		grid-column: 2 / -1;
+		min-width: 0;
+	}
+
+	.figures {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px 20px;
+		margin: 6px 0;
 	}
 
 	.seed {
