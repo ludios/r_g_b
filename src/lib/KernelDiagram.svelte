@@ -1,12 +1,12 @@
 <!-- Model-output: Claude Opus 5.5 -->
 <script lang="ts">
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
-	// screen, whose area is the weight's size, filled if positive and hollow if negative; past 1
-	// either way, the square fills its cell, in the accent color except the middle tap's, which has
-	// the accent's outline already. Dragging a square up or down changes its weight, and clicking
-	// one, or choosing it with the arrow keys, gives a field to type it in; the taps that change
-	// with it are outlined, it more heavily. The middle tap is whatever makes the sum 1, so it
-	// follows the others rather than being edited itself.
+	// screen, whose area is the weight's size, filled if positive and hollow if negative. Past 1
+	// either way, the square fills its cell to the edge, in the accent color but for the middle
+	// tap's; its outline is the accent already. Dragging a square up or down changes its weight,
+	// and clicking one, or choosing it with the arrow keys, gives a field to type it in; the taps
+	// that change with it are outlined, it more heavily. The middle tap is whatever makes the sum 1,
+	// so it follows the others rather than being edited itself.
 	import { tick } from "svelte";
 	import { type Group, type Kernel, MIDDLE, TAPS, group_of, neighbor_tap, reweighted, tap_offset } from "./kernel";
 
@@ -76,11 +76,14 @@
 	}
 
 	/**
-	 * A square's side: by area, up to most of the cell at 1; past that, all of the cell but a pixel
-	 * each side, which keeps a hollow square's stroke inside it.
+	 * A square's side: by area, up to most of the cell at 1, which leaves a gap to the cell's edge;
+	 * past that, the whole cell, less a hollow square's stroke so that it stays inside.
 	 */
 	function side(weight: number): number {
-		return over(weight) ? CELL - 2 : CELL * 0.9 * Math.sqrt(Math.abs(weight));
+		if (!over(weight)) {
+			return CELL * 0.9 * Math.sqrt(Math.abs(weight));
+		}
+		return weight < 0 ? CELL - 1.5 : CELL;
 	}
 
 	/** Where tap `i` reads from, in taps from the pixel itself; up is +y. */
@@ -255,7 +258,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<g class="tap" class:middle={i === MIDDLE} onpointerdown={(e) => down(e, i)} onpointerenter={() => (hover = i)}>
 				<rect class="cell" x={x} y={y} width={CELL} height={CELL} />
-				<rect class="weight" class:negative={w < 0} class:over={over(w) && i !== MIDDLE} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
+				<rect class="weight" class:negative={w < 0} class:over={over(w)} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
 			</g>
 		{/each}
 		{#each [MIDDLE, ...linked] as i (i)}
@@ -320,10 +323,11 @@
 		stroke: var(--text);
 		stroke-width: 1.5;
 	}
-	.weight.over {
+	/* The middle tap's outline is the accent already. */
+	.tap:not(.middle) > .weight.over {
 		fill: var(--accent);
 	}
-	.weight.over.negative {
+	.tap:not(.middle) > .weight.over.negative {
 		fill: none;
 		stroke: var(--accent);
 	}
