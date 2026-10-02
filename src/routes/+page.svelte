@@ -747,12 +747,13 @@
 						</div>
 					</div>
 					{#if settings.mouse_x === "r_g_b"}
-						<p class="muted">x: r_g_b.html sets Contrast, rising evenly from 0.8× at the left edge to 3.8× at the right.</p>
+						<p class="muted">x: r_g_b.html sets Contrast while the kernel is random, rising evenly from 0.8× at the left edge to 3.8× at the right.</p>
 					{/if}
 					{#if settings.mouse_y === "r_g_b"}
 						<p class="muted">y: r_g_b.html sets Persistence from 0% at the top to almost 100% at the bottom, which all but freezes the image, and Spacing from 0.2 px to a third of the image’s height, at most 256 px. Both double every tenth of the way down, within those limits.</p>
 					{/if}
-					{#if mouse_frozen(settings.mouse_x, "x") || mouse_frozen(settings.mouse_y, "y")}
+					<!-- The x: r_g_b.html line says as much for itself. -->
+					{#if (settings.mouse_x !== "r_g_b" && mouse_frozen(settings.mouse_x, "x")) || mouse_frozen(settings.mouse_y, "y")}
 						<p class="muted">Contrast & Drift are left alone for preset or edited kernels.</p>
 					{/if}
 					<div class="row">
