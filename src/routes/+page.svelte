@@ -493,6 +493,9 @@
 	const BALANCE_LABELS: Record<Balance, string> = { middle: "the middle tap", others: "all the other taps" };
 	const SEED_LABELS:  Record<Seeds, string> = { rgb: "R G B dots", white: "White dot", pixel: "One pixel", none: "None" };
 	const VIEW_LABELS:  Record<View, string>  = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
+	/** The View section's lines: the picture and its channels, then what the last step did. */
+	const VIEW_LINES: View[][] = [["color", "red", "green", "blue"], ["change", "clipped"]];
+	A.eq(VIEW_LINES.flat().join(), VIEWS.join());
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
 	const SETTINGS_PRESET_LABELS: Record<SettingsPreset, string> = { still: "No mouse", noise: "From noise", gray: "Black and white", paint: "Paint" };
 </script>
@@ -681,9 +684,13 @@
 
 				<details class="section" bind:open={open.view}>
 					<summary>View</summary>
-					<div class="choices">
-						{#each VIEWS as view (view)}
-							<label><input type="radio" name="view" bind:group={settings.view} value={view} /> {VIEW_LABELS[view]}</label>
+					<div class="lines">
+						{#each VIEW_LINES as line (line)}
+							<div class="choices">
+								{#each line as view (view)}
+									<label><input type="radio" name="view" bind:group={settings.view} value={view} /> {VIEW_LABELS[view]}</label>
+								{/each}
+							</div>
 						{/each}
 					</div>
 				</details>
@@ -917,6 +924,11 @@
 		align-items: center;
 		gap: 4px 12px;
 		font-size: 12px;
+	}
+	/* Lines of choices that each start on a new line, as far apart as a wrapped line. */
+	.lines {
+		display: grid;
+		gap: 4px;
 	}
 	input[type="checkbox"] {
 		margin: 0;
