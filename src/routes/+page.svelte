@@ -946,7 +946,7 @@
 		gap: 4px 12px;
 	}
 	/* Choices that share their line in halves, whatever their longest option; a select too long for
-	   its half is cut off until it's opened. 8.5em fits "X r_g_b.html", so below that they wrap. */
+	   its half is cut off until it's opened. 8.5em fits "x: r_g_b.html", so below that they wrap. */
 	.halves > label {
 		flex: 1 1 0;
 		min-width: 8.5em;
