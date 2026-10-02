@@ -1008,7 +1008,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: flex-start;
-		gap: 12px clamp(12px, 100% - 309px, 24px);
+		gap: 12px clamp(12px, 100% - 132px - 177px, 24px);
 		margin: 6px 0 0;
 	}
 
