@@ -533,11 +533,11 @@
 		<section class="card">
 			<p class="credit">The shader here is not my work or idea; it is <a href="https://vbuckenham.com/">v buckenham</a>'s amazing <a href="https://v21.io/r_g_b.html">r_g_b.html</a>, remixed here for educational purposes.</p>
 			<details class="section" bind:open={open.how}>
-				<summary>How it works (slop)</summary>
+				<summary>How it works (this is partly slop)</summary>
 				<div class="prose">
 					<h3>How the image changes</h3>
 					<p>The image filters itself over and over. Each step uses the previous image to make the next, stored at the selected <strong>Bit depth</strong>.</p>
-					<p>For each pixel, the filter reads 25 samples in a 5×5 grid centered on that pixel, multiplies each by a weight, and adds the results. Each sample position is called a <strong>tap</strong>. The 25 taps and their weights make up the <strong>kernel</strong>.</p>
+					<p>For each pixel, the filter reads 25 samples in a 5×5 grid, spread out by <strong>Spacing</strong> and centered on that pixel, multiplies each by a weight, and adds the results. Each sample position is called a <strong>tap</strong>. The 25 taps and their weights make up the <strong>kernel</strong>.</p>
 					<p><strong>Persistence</strong> mixes the result with the pixel’s old value. A negative setting makes the change larger instead. Each color channel is then clipped to the range 0–1. If stamping is on, the seeds are painted back over the result.</p>
 					<h3>Starting a pattern</h3>
 					<p>The kernel’s weights add up to 1, so a flat color stays flat. To get a pattern started, use <strong>Noise</strong>, paint, or seeds. You can also click the <strong>Frequency Response</strong> map to restart with a stripe pattern.</p>
