@@ -908,9 +908,10 @@
 		gap: 4px 12px;
 		font-size: 12px;
 	}
-	/* Stacked lines of choices are as far apart as a wrapped line. */
-	.choices + .choices {
-		margin-top: 4px;
+	/* A line of choices of its own sits as far from the title and its neighbors as a row does,
+	   which is as far as a wrapped line. */
+	.section > .choices {
+		margin: 4px 0;
 	}
 	input[type="checkbox"], input[type="radio"] {
 		margin: 0;
