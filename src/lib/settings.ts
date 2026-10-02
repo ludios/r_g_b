@@ -18,8 +18,8 @@ export type MouseTarget = Param | "spacing_persistence" | "r_g_b";
 
 export const MOUSE_TARGETS: readonly MouseTarget[] = [...PARAMS, "spacing_persistence", "r_g_b"];
 
-/** What a click or tap on the image does; painting and erasing also drag. */
-export const CLICKS = ["kernel", "paint", "erase", "taps"] as const;
+/** What a click or tap on the image does, if anything; painting and erasing also drag. */
+export const CLICKS = ["kernel", "paint", "erase", "taps", "none"] as const;
 export type Click = (typeof CLICKS)[number];
 
 /**

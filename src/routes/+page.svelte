@@ -484,7 +484,7 @@
 
 	const MOUSE_LABELS:  Record<MouseTarget, string> = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence",
 		spacing_persistence: "Spacing + persistence", r_g_b: "r_g_b.html" };
-	const CLICK_LABELS:  Record<Click, string>  = { kernel: "New kernel", paint: "Paint", erase: "Erase", taps: "Show taps" };
+	const CLICK_LABELS:  Record<Click, string>  = { kernel: "New kernel", paint: "Paint", erase: "Erase", taps: "Show taps", none: "Nothing" };
 	const PRESET_LABELS: Record<Preset, string> = {
 		identity: "Identity", box: "Box blur", shift: "Shift", lean: "Lean", skip: "Every other tap",
 		row: "One row", saddle: "Saddle", ring: "Center-surround", circles: "Circles", pinwheel: "Pinwheel",
