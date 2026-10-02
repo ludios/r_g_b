@@ -7,7 +7,7 @@
 	// type it in; the taps that change with it are outlined, it more heavily. The middle tap is
 	// whatever makes the sum 1, so it follows the others rather than being edited itself.
 	import { tick } from "svelte";
-	import { type Group, type Kernel, MIDDLE, TAPS, group_of, index_of, reweighted, tap_offset } from "./kernel";
+	import { type Group, type Kernel, MIDDLE, TAPS, group_of, neighbor_tap, reweighted, tap_offset } from "./kernel";
 
 	interface Props {
 		kernel: Kernel;
@@ -167,19 +167,6 @@
 	}
 
 	/**
-	 * The tap an arrow key goes to from tap `from` by `dx`, `dy`: the next one that way, stepping
-	 * over the middle, which can't be selected, or `from` itself at the edge.
-	 */
-	function step(from: number, dx: number, dy: number): number {
-		let { x, y } = tap_offset(from);
-		do {
-			x += dx;
-			y += dy;
-		} while (x === 0 && y === 0);
-		return Math.abs(x) > 2 || Math.abs(y) > 2 ? from : index_of(x, y);
-	}
-
-	/**
 	 * On the diagram, the arrow keys choose a tap, starting from the middle; Enter, or the start of a
 	 * number, goes to its field (the keystroke lands there); Escape unselects it, or with none
 	 * selected, leaves the diagram. Keys it takes are marked as handled. Shortcuts with Ctrl, Alt or
@@ -192,7 +179,7 @@
 		const arrow = ARROWS[event.key];
 		if (arrow !== undefined) {
 			event.preventDefault();
-			selected = step(selected ?? MIDDLE, ...arrow);
+			selected = neighbor_tap(selected ?? MIDDLE, ...arrow);
 		} else if (selected !== null && event.key === "Enter") {
 			event.preventDefault();
 			edit_field();

@@ -2,7 +2,7 @@
 import { AssertionError } from "ayy";
 import { array, assert, constantFrom, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
-import { FLAT, GROUPS, Kernels, MAX_SEED, MIDDLE, PRESETS, TAPS, TRANSFORMS, balanced, gen_kernel, group_of, mutated, next_seed, reweighted, seeded_kernel, with_contrast, with_drift } from "./kernel";
+import { FLAT, GROUPS, Kernels, MAX_SEED, MIDDLE, PRESETS, TAPS, TRANSFORMS, balanced, gen_kernel, group_of, mutated, neighbor_tap, next_seed, reweighted, seeded_kernel, tap_offset, with_contrast, with_drift } from "./kernel";
 
 /** Uniform draws in [0, 1), as many as a kernel takes: two per tap and one for the smoothing. */
 const draws = array(double({ min: 0, max: 1, maxExcluded: true, noNaN: true }), { minLength: 2 * TAPS + 1, maxLength: 2 * TAPS + 1 });
@@ -104,6 +104,41 @@ describe("group_of", () => {
 
 	test("refuses the middle tap, which follows the others", () => {
 		expect(() => group_of(MIDDLE, "tap")).toThrow(AssertionError);
+	});
+});
+
+describe("neighbor_tap", () => {
+	const ARROWS = [[-1, 0], [1, 0], [0, -1], [0, 1]] as const;
+
+	test("goes one tap that way, but over the middle, and stays put at the edge", () => {
+		assert(property(integer({ min: 0, max: TAPS - 1 }), constantFrom(...ARROWS), (from, [dx, dy]) => {
+			const { x, y } = tap_offset(from);
+			const steps = x + dx === 0 && y + dy === 0 ? 2 : 1;
+			const next  = { x: x + steps * dx, y: y + steps * dy };
+			const edge  = Math.abs(next.x) > 2 || Math.abs(next.y) > 2;
+			const to    = neighbor_tap(from, dx, dy);
+			expect(to).not.toBe(MIDDLE);
+			expect(tap_offset(to)).toEqual(edge ? { x, y } : next);
+		}));
+	});
+
+	test("reaches every tap but the middle from the middle", () => {
+		const reached = new Set([MIDDLE]);
+		const queue = [MIDDLE];
+		for (let from = queue.pop(); from !== undefined; from = queue.pop()) {
+			for (const [dx, dy] of ARROWS) {
+				const to = neighbor_tap(from, dx, dy);
+				if (!reached.has(to)) {
+					reached.add(to);
+					queue.push(to);
+				}
+			}
+		}
+		expect(reached.size).toBe(TAPS);
+	});
+
+	test("refuses to go nowhere", () => {
+		expect(() => neighbor_tap(0, 0, 0)).toThrow(AssertionError);
 	});
 });
 

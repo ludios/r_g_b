@@ -197,8 +197,15 @@ export function with_drift(kernel: Kernel, drift: number): Kernel {
 	});
 }
 
+/** Whether `x`, `y` is where a tap is: each from -2 to 2. */
+function in_kernel(x: number, y: number): boolean {
+	return Math.abs(x) <= 2 && Math.abs(y) <= 2;
+}
+
 /** The index of the tap at `x`, `y`, each from -2 to 2. */
-export function index_of(x: number, y: number): number {
+function index_of(x: number, y: number): number {
+	A.lte(Math.abs(x), 2);
+	A.lte(Math.abs(y), 2);
 	return (y + 2) * 5 + (x + 2);
 }
 
@@ -216,7 +223,7 @@ function moved(kernel: Kernel, to: (x: number, y: number) => [number, number]): 
 function diffused(kernel: Kernel, rate: number): Kernel {
 	return kernel.map((k, i) => {
 		const { x, y } = tap_offset(i);
-		const neighbors = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([nx, ny]) => Math.abs(nx!) <= 2 && Math.abs(ny!) <= 2);
+		const neighbors = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([nx, ny]) => in_kernel(nx!, ny!));
 		return k + rate * neighbors.reduce((sum, [nx, ny]) => sum + kernel[index_of(nx!, ny!)]! - k, 0);
 	});
 }
@@ -239,6 +246,20 @@ export type Transform = keyof typeof TRANSFORMS;
 
 /** The middle tap: edits set the others, and it's whatever makes the sum 1. */
 export const MIDDLE = index_of(0, 0);
+
+/**
+ * The next tap from tap `from` in the direction `dx`, `dy` (each -1, 0 or 1, not both 0), stepping
+ * over the middle, which edits leave to follow the others; or `from` itself at the kernel's edge.
+ */
+export function neighbor_tap(from: number, dx: number, dy: number): number {
+	A.neq(Math.abs(dx) + Math.abs(dy), 0);
+	let { x, y } = tap_offset(from);
+	do {
+		x += dx;
+		y += dy;
+	} while (x === 0 && y === 0);
+	return in_kernel(x, y) ? index_of(x, y) : from;
+}
 
 /** Which taps an edit changes together: one, it and its mirror image through the middle, or its ring. */
 export const GROUPS = ["tap", "pair", "ring"] as const;
