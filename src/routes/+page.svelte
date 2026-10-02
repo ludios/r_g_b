@@ -893,12 +893,13 @@
 	.row > span:first-child, .row > .check {
 		font-size: 12px;
 	}
-	/* A row of choices has no readout, so it runs to the edge; when they wrap, the label stays with the first line. */
-	.row:has(> .choices) {
-		align-items: baseline;
-	}
+	/* A row of choices has no readout, so it runs to the edge. */
 	.row > .choices {
 		grid-column: 2 / -1;
+	}
+	/* When its choices wrap, the label stays with the first line. */
+	.row:has(> .choices) {
+		align-items: baseline;
 	}
 	.row output {
 		font-size: 12px;
@@ -921,7 +922,7 @@
 	.choices {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: center;
+		align-items: baseline;
 		gap: 4px 12px;
 		font-size: 12px;
 	}
@@ -930,7 +931,7 @@
 		display: grid;
 		gap: 4px;
 	}
-	input[type="checkbox"] {
+	input[type="checkbox"], input[type="radio"] {
 		margin: 0;
 	}
 	input[type="color"] {
