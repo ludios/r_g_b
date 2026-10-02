@@ -735,7 +735,7 @@
 					<div class="row">
 						<span>Position changes</span>
 						<div class="choices halves">
-							{#each [["X", "mouse_x"], ["Y", "mouse_y"]] as const as [axis, key] (key)}
+							{#each [["x:", "mouse_x"], ["y:", "mouse_y"]] as const as [axis, key] (key)}
 								<label>{axis} <select bind:value={settings[key]}>
 									<option value={null}>nothing</option>
 									{#each MOUSE_TARGETS as target (target)}
