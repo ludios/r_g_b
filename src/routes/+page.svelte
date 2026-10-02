@@ -29,7 +29,7 @@
 	const storage  = local_storage();
 	const SECTIONS_KEY = "r_g_b-open-sections";
 	/** The card's sections, and whether each starts open. */
-	const SECTIONS = { time: true, start: true, taps: true, kernel: true, pointer: true, view: true, how: false };
+	const SECTIONS = { how: false, time: true, start: true, taps: true, kernel: true, pointer: true, view: true };
 	type Section = keyof typeof SECTIONS;
 	/** Which of the card's sections are open, kept in localStorage. */
 	let open = $state(read_open());
@@ -347,7 +347,7 @@
 		settings[key] = value_at(SLIDERS[key], event.currentTarget.valueAsNumber);
 	}
 
-	/** Puts the settings back to the defaults; the kernel stays. */
+	/** Puts the settings back to the defaults, which play like r_g_b.html; the kernel stays. */
 	function reset(): void {
 		settings = { ...DEFAULT_SETTINGS };
 	}
@@ -490,12 +490,12 @@
 		identity: "Identity", box: "Box blur", shift: "Shift", lean: "Lean", skip: "Every other tap",
 		row: "One row", saddle: "Saddle", ring: "Center-surround", circles: "Circles", pinwheel: "Pinwheel",
 		dots: "Dots", hexagons: "Hexagons", sharpen: "Sharpen",
-		checker: "Checkerboard", advect: "Advect", rise: "Rise",
+		checker: "Checkerboard", advect: "Advect", rise: "Rise", emboss: "Emboss",
 	};
 	const PRESET_GROUPS: [string, Preset[]][] = [
 		["Nothing grows", ["identity", "box", "shift", "lean", "skip"]],
 		["Stripes grow", ["row", "saddle", "ring", "circles", "pinwheel", "dots", "hexagons", "sharpen"]],
-		["Stripes grow and move", ["checker", "advect", "rise"]],
+		["Stripes grow and move", ["checker", "advect", "rise", "emboss"]],
 	];
 	A.eq(PRESET_GROUPS.flatMap(([, names]) => names).toSorted().join(), PRESET_NAMES.toSorted().join());
 	const GROUP_LABELS: Record<Group, string> = { tap: "one tap", pair: "a tap and the one opposite", ring: "a tap's whole ring" };
@@ -532,6 +532,31 @@
 	{#if show_card}
 		<section class="card">
 			<p class="credit">The shader here is not my work or idea; it is <a href="https://vbuckenham.com/">v buckenham</a>'s amazing <a href="https://v21.io/r_g_b.html">r_g_b.html</a>, remixed here for educational purposes.</p>
+			<details class="section" bind:open={open.how}>
+				<summary>How it works (slop)</summary>
+				<div class="prose">
+					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the Hinton Diagram's squares are their weights, hollow if negative and bronze past 1 either way. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat; to keep it so, when a square is dragged or typed in, the middle one takes up the difference.</p>
+					<p>“Tap” is a signal-processing term for one place a filter reads a sample and multiplies it by a weight. It comes from FIR filters built as a tapped delay line: a signal runs down a chain of delays, and each tap pulls off a copy and scales it. Here each tap is an offset from the pixel (x and y from −2 to 2, times Spacing) and a weight (its square in the diagram).</p>
+					<p>The Frequency Response map estimates what a step multiplies stripes' contrast by, for every stripe width and direction (flat in the middle, finer outward), before clipping: shaded where that's over 1, so they grow, and circled where fastest. A step can also shift stripes; half a cycle swaps bright and dark, and near that (hatched) they strobe.</p>
+					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them. The mouse moves either only while the kernel is random, so a preset or an edited kernel stays as it was chosen or made.</p>
+					<p>Taps are Spacing apart, rounded to whole pixels, so fine stripes can look like wider ones to them, and the map roughly repeats. Jitter gives each pixel its own fixed spacing, blurring the repeats and tending to favor the widest stripes.</p>
+					<p>A flat ground stays flat, so something has to break it: Noise, a restart from stripes clicked on the Frequency Response map, paint, or the seeds. By default the seeds are a red, a green and a blue dot in a line through the middle, at 1/6, 1/2 and 5/6 of the window's longer side. With stamping on, each step paints them back over its result, so they stay put and keep feeding what grows around them; with it off, they're only where things start, and change like any other pixel.</p>
+					<p>Each step's result is stored at the Bit Depth. At 8 bits every channel is rounded to one of 256 levels, so a change of less than half a level is lost: a blur slows as it spreads, then stops, leaving a soft trace of what it blurred. 16-bit and 32-bit floats round far more finely, so a blur gets much flatter before it stops (at 32, too flat to see), for more memory and time per step.</p>
+					<p>Red, green and blue follow the rule separately. On dark gray, the red dot raises red and lowers green and blue, so they start opposite: red against cyan.</p>
+					<p>When no control has focus, Space pauses and plays, Enter steps while paused, Z undoes a change to the kernel and Shift-Z redoes it. On the Hinton Diagram, the arrow keys choose a tap and typing a number sets it.</p>
+				</div>
+			</details>
+
+			<div class="row">
+				<span>Presets</span>
+				<div class="choices presets">
+					<button type="button" onclick={reset}>r_g_b.html</button>
+					{#each SETTINGS_PRESET_NAMES as preset (preset)}
+						<button type="button" onclick={() => apply(preset)}>{SETTINGS_PRESET_LABELS[preset]}</button>
+					{/each}
+				</div>
+			</div>
+
 			<form novalidate onsubmit={(e) => e.preventDefault()}>
 				<details class="section" bind:open={open.time}>
 					<summary>Time</summary>
@@ -743,40 +768,14 @@
 				</details>
 			</form>
 
-			<details class="section" bind:open={open.how}>
-				<summary>How it works (slop)</summary>
-				<div class="prose">
-					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the Hinton Diagram's squares are their weights, hollow if negative and bronze past 1 either way. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat; to keep it so, when a square is dragged or typed in, the middle one takes up the difference.</p>
-					<p>“Tap” is a signal-processing term for one place a filter reads a sample and multiplies it by a weight. It comes from FIR filters built as a tapped delay line: a signal runs down a chain of delays, and each tap pulls off a copy and scales it. Here each tap is an offset from the pixel (x and y from −2 to 2, times Spacing) and a weight (its square in the diagram).</p>
-					<p>The Frequency Response map estimates what a step multiplies stripes' contrast by, for every stripe width and direction (flat in the middle, finer outward), before clipping: shaded where that's over 1, so they grow, and circled where fastest. A step can also shift stripes; half a cycle swaps bright and dark, and near that (hatched) they strobe.</p>
-					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them. The mouse moves either only while the kernel is random, so a preset or an edited kernel stays as it was chosen or made.</p>
-					<p>Taps are Spacing apart, rounded to whole pixels, so fine stripes can look like wider ones to them, and the map roughly repeats. Jitter gives each pixel its own fixed spacing, blurring the repeats and tending to favor the widest stripes.</p>
-					<p>A flat ground stays flat, so something has to break it: Noise, a restart from stripes clicked on the Frequency Response map, paint, or the seeds. By default the seeds are a red, a green and a blue dot in a line through the middle, at 1/6, 1/2 and 5/6 of the window's longer side. With stamping on, each step paints them back over its result, so they stay put and keep feeding what grows around them; with it off, they're only where things start, and change like any other pixel.</p>
-					<p>Each step's result is stored at the Bit Depth. At 8 bits every channel is rounded to one of 256 levels, so a change of less than half a level is lost: a blur slows as it spreads, then stops, leaving a soft trace of what it blurred. 16-bit and 32-bit floats round far more finely, so a blur gets much flatter before it stops (at 32, too flat to see), for more memory and time per step.</p>
-					<p>Red, green and blue follow the rule separately. On dark gray, the red dot raises red and lowers green and blue, so they start opposite: red against cyan.</p>
-					<p>When no control has focus, Space pauses and plays, Enter steps while paused, Z undoes a change to the kernel and Shift-Z redoes it. On the Hinton Diagram, the arrow keys choose a tap and typing a number sets it.</p>
-				</div>
-			</details>
-
-			<div class="row">
-				<span>Presets</span>
-				<div class="choices presets">
-					{#each SETTINGS_PRESET_NAMES as preset (preset)}
-						<button type="button" onclick={() => apply(preset)}>{SETTINGS_PRESET_LABELS[preset]}</button>
+			<label class="row">
+				<span>UI theme</span>
+				<select class="wide" value={theme.theme} onchange={(e) => theme.set(parse_theme(e.currentTarget.value))}>
+					{#each THEMES as option (option)}
+						<option value={option}>{THEME_LABELS[option]}</option>
 					{/each}
-				</div>
-			</div>
-			<footer class="actions">
-				<button type="button" onclick={reset}>Reset settings</button>
-				<label class="theme">
-					<span>Theme</span>
-					<select value={theme.theme} onchange={(e) => theme.set(parse_theme(e.currentTarget.value))}>
-						{#each THEMES as option (option)}
-							<option value={option}>{THEME_LABELS[option]}</option>
-						{/each}
-					</select>
-				</label>
-			</footer>
+				</select>
+			</label>
 		</section>
 	{/if}
 </div>
@@ -844,21 +843,6 @@
 		margin: 2px 0 4px;
 	}
 
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 6px 8px;
-		margin: 4px 0;
-	}
-
-	.theme {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		margin-left: auto;
-		font-size: 12px;
-	}
 	select {
 		padding: 1px 2px;
 		background: var(--card);
@@ -872,9 +856,11 @@
 		margin: 6px 0 0;
 		padding: 4px 0 2px;
 	}
-	form > .section:first-child {
-		border-top: 0;
-		margin-top: 0;
+	/* The card's own rows are parts of it, ruled off like the sections. */
+	.card > .row {
+		border-top: 1px solid var(--rule);
+		margin: 6px 0 0;
+		padding: 6px 0 2px;
 	}
 	summary {
 		cursor: pointer;

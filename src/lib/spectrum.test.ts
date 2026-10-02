@@ -189,4 +189,11 @@ describe("presets", () => {
 		expect(fastest_along(PRESETS.pinwheel, -21)).toBeLessThan(turned[0]!);
 		expect(fastest_along(TRANSFORMS.mirror(PRESETS.pinwheel), -21)).toBeCloseTo(turned[2]!, 9);
 	});
+
+	test("emboss grows stripes running up and right 7 times a step as they slide up and left", () => {
+		expect(fastest_along(PRESETS.emboss, 135)).toBeGreaterThan(7);
+		expect(fastest_along(PRESETS.emboss, 45)).toBeCloseTo(1, 12);
+		// Waves running up and left come out of a step behind where they were: moved along.
+		expect(multiplier({ kernel: PRESETS.emboss, spacing: 1, jitter: 0, persistence: 0 }, -0.15, 0.15).phase).toBeLessThan(0);
+	});
 });

@@ -95,6 +95,12 @@ export const PRESETS = {
 	 * a seed stamped every step trails a V-shaped plume.
 	 */
 	rise:     kernel_of((x, y) => (y === -1 ? [-0.25, 0.5, 0.5, 0.5, -0.25][x + 2]! : 0)),
+	/**
+	 * The image editors' emboss: the identity plus x - y over the middle 3x3, lopsided as advect
+	 * is, but diagonally. Stripes 4.7 taps apart running up and right grow 7 times a step as they
+	 * slide up and left. Drift 0 is the identity.
+	 */
+	emboss:   kernel_of((x, y) => (Math.abs(x) <= 1 && Math.abs(y) <= 1 ? Number(x === 0 && y === 0) + x - y : 0)),
 } satisfies Record<string, Kernel>;
 
 export type Preset = keyof typeof PRESETS;
