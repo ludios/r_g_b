@@ -1007,11 +1007,13 @@
 		visibility: hidden;
 	}
 
+	/* Between the diagram (132px) and the map (177px): 24px, or down to 12px where a scrollbar or a
+	   narrow screen takes the room, before the map wraps under the diagram. */
 	.figures {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: flex-start;
-		gap: 12px 24px;
+		gap: 12px clamp(12px, 100% - 309px, 24px);
 		margin: 6px 0 0;
 	}
 
