@@ -776,7 +776,6 @@
 					</select>
 				</label>
 			</footer>
-			<p class="credit">The shader here is not my work or idea; it's <a href="https://vbuckenham.com/">v buckenham</a>'s amazing <a href="https://v21.io/r_g_b.html">r_g_b.html</a>, remixed here for educational purposes.</p>
 		</section>
 	{/if}
 </div>
