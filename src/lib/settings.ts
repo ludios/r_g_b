@@ -50,7 +50,10 @@ export interface Settings {
 	spacing: number;
 	/** How far each pixel's tap spacing is scaled from 1, at most: 0.05 is +/-5%. */
 	jitter: number;
-	/** How much of the previous frame each step keeps, 0 to 1. */
+	/**
+	 * How much of the previous frame each step keeps, -1 to 1. Below 0 the step goes past the
+	 * kernel's result, away from the previous frame: more of what the kernel does.
+	 */
 	persistence: number;
 	/** Steps per display frame: a power of two, from 1/32 to 8. */
 	speed: number;
@@ -119,7 +122,7 @@ export const SLIDERS = {
 	morph_steps: { min: 60,     max: 36000, scale: "log",    positions: 120, integer: true },
 	spacing:     { min: 1,      max: 256,   scale: "log",    positions: 240 },
 	jitter:      { min: 0,      max: 0.25,  scale: "linear", positions: 100 },
-	persistence: { min: 0,      max: 1,     scale: "linear", positions: 400 },
+	persistence: { min: -1,     max: 1,     scale: "linear", positions: 400 },
 	speed:       { min: 1 / 32, max: 8,     scale: "log",    positions: 8 },
 	ground:      { min: 0,      max: 1,     scale: "linear", positions: 255 },
 	noise:       { min: 0,      max: 0.5,   scale: "linear", positions: 100 },

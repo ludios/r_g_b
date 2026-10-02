@@ -53,6 +53,6 @@ describe("codec", () => {
 	test("reads junk as the defaults, and numbers past an end as that end", () => {
 		expect(decode("?k=-1&c=pony&mx=everything&m=yes")).toEqual({ settings: DEFAULT_SETTINGS, kernel: null });
 		expect(decode("").settings).toEqual(DEFAULT_SETTINGS);
-		expect(decode("s=9999&p=-3&k=1.5")).toEqual({ settings: { ...DEFAULT_SETTINGS, spacing: SLIDERS.spacing.max, persistence: 0 }, kernel: null });
+		expect(decode("s=9999&p=-3&k=1.5")).toEqual({ settings: { ...DEFAULT_SETTINGS, spacing: SLIDERS.spacing.max, persistence: -1 }, kernel: null });
 	});
 });

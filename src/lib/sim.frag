@@ -8,7 +8,7 @@ uniform bool stamp;           // Whether to re-stamp the seeds
 uniform float kernel[25];     // Row-major 5x5 weights, summing to 1
 uniform float tap_spacing;    // In pixels
 uniform float jitter;         // Each pixel scales its tap spacing by 1 +/- up to this
-uniform float persistence;    // How much of the previous frame to keep
+uniform float persistence;    // How much of the previous frame to keep, -1 to 1
 uniform bool starting;        // Whether to start afresh rather than step: the ground, noise and seeds
 uniform float ground;         // The gray to start from
 uniform float noise;          // How far each channel of each pixel starts from the ground, at most
@@ -57,7 +57,8 @@ vec3 step_from_previous(vec2 uv) {
 		}
 	}
 	// Same as blending the kernel toward identity: slows growth; persistence = 1 freezes the image.
-	return mix(sum.rgb, texelFetch(prev_frame, ivec2(gl_FragCoord.xy), 0).rgb, clamp(persistence, 0.0, 1.0));
+	// Below 0, it blends away from identity: more of what the kernel does.
+	return mix(sum.rgb, texelFetch(prev_frame, ivec2(gl_FragCoord.xy), 0).rgb, clamp(persistence, -1.0, 1.0));
 }
 
 // The distance from p to the segment from a to b.

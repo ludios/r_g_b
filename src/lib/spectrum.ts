@@ -61,7 +61,7 @@ export function multiplier(model: StepModel, fx: number, fy: number): Mode {
 		re += kernel[i]! * damp * Math.cos(2 * Math.PI * along);
 		im += kernel[i]! * damp * Math.sin(2 * Math.PI * along);
 	}
-	const p = Math.min(1, Math.max(0, persistence));
+	const p = Math.min(1, Math.max(-1, persistence));
 	re = p + (1 - p) * re;
 	im = (1 - p) * im;
 	return { fx, fy, growth: Math.hypot(re, im), phase: Math.atan2(im, re) };
@@ -82,7 +82,7 @@ export function growth_map(model: StepModel, size: number): GrowthMap {
 	const reach = Math.min(0.5, 1.5 / spacing);
 	const half  = (size - 1) / 2;
 	const step  = reach / half; // Cycles per pixel from one point to the next
-	const p     = Math.min(1, Math.max(0, model.persistence));
+	const p     = Math.min(1, Math.max(-1, model.persistence));
 
 	// The phase each tap's offset gives a wave, per axis: at column or row k (from -half to half)
 	// and tap d (from -2 to 2), 2 pi k step floor(0.5 + spacing d).

@@ -31,7 +31,7 @@ describe("multiplier", () => {
 	test("is what one step does to a wave that fits the image", () => {
 		const n = 48;
 		assert(property(integer({ min: 0, max: 1000 }), integer({ min: -6, max: 6 }), integer({ min: -6, max: 6 }),
-			double({ min: 1, max: 9, noNaN: true }), double({ min: 0, max: 1, noNaN: true }), (seed, kx, ky, spacing, persistence) => {
+			double({ min: 1, max: 9, noNaN: true }), double({ min: -1, max: 1, noNaN: true }), (seed, kx, ky, spacing, persistence) => {
 				const model: StepModel = { kernel: seeded_kernel(seed), spacing, jitter: 0, persistence };
 				const fx = kx / n;
 				const fy = ky / n;
@@ -66,7 +66,7 @@ describe("multiplier", () => {
 describe("growth_map", () => {
 	test("is the multiplier at each point", () => {
 		assert(property(integer({ min: 0, max: 1000 }), double({ min: 1, max: 50, noNaN: true }), double({ min: 0, max: 0.25, noNaN: true }),
-			double({ min: 0, max: 1, noNaN: true }), integer({ min: 0, max: 21 * 21 - 1 }), (seed, spacing, jitter, persistence, index) => {
+			double({ min: -1, max: 1, noNaN: true }), integer({ min: 0, max: 21 * 21 - 1 }), (seed, spacing, jitter, persistence, index) => {
 				const model: StepModel = { kernel: seeded_kernel(seed), spacing, jitter, persistence };
 				const mode = mode_at(growth_map(model, 21), index);
 				const exact = multiplier(model, mode.fx, mode.fy);
