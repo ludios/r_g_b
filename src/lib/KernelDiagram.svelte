@@ -2,10 +2,11 @@
 <script lang="ts">
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
 	// screen, whose area is the weight's size, filled if positive and hollow if negative; past 1
-	// either way, the square fills its cell in the accent color. Dragging a square up or down
-	// changes its weight, and clicking one, or choosing it with the arrow keys, gives a field to
-	// type it in; the taps that change with it are outlined, it more heavily. The middle tap is
-	// whatever makes the sum 1, so it follows the others rather than being edited itself.
+	// either way, the square fills its cell, in the accent color except the middle tap's, which has
+	// the accent's outline already. Dragging a square up or down changes its weight, and clicking
+	// one, or choosing it with the arrow keys, gives a field to type it in; the taps that change
+	// with it are outlined, it more heavily. The middle tap is whatever makes the sum 1, so it
+	// follows the others rather than being edited itself.
 	import { tick } from "svelte";
 	import { type Group, type Kernel, MIDDLE, TAPS, group_of, neighbor_tap, reweighted, tap_offset } from "./kernel";
 
@@ -254,7 +255,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<g class="tap" class:middle={i === MIDDLE} onpointerdown={(e) => down(e, i)} onpointerenter={() => (hover = i)}>
 				<rect class="cell" x={x} y={y} width={CELL} height={CELL} />
-				<rect class="weight" class:negative={w < 0} class:over={over(w)} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
+				<rect class="weight" class:negative={w < 0} class:over={over(w) && i !== MIDDLE} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
 			</g>
 		{/each}
 		{#each [MIDDLE, ...linked] as i (i)}
