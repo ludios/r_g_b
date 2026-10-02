@@ -1,11 +1,14 @@
 // Model-output: Claude Opus 5.5
 
 // The simulation on the GPU: ping-pong buffers, the step shader, and drawing to the canvas.
+import { getLogger } from "@logtape/logtape";
 import * as THREE from "three";
 import type { Kernel } from "./kernel";
 import { type BitDepth, type Seeds, VIEWS, type View } from "./settings";
 import screen_shader from "./screen.frag?raw";
 import sim_shader from "./sim.frag?raw";
+
+const log = getLogger(["r_g_b", "simulation"]);
 
 /** How far a planted wave's stripes swing from the ground. */
 const WAVE = 0.05;
@@ -16,6 +19,12 @@ const TEXEL_TYPES = {
 	16: THREE.HalfFloatType,
 	32: THREE.FloatType,
 } as const satisfies Record<BitDepth, THREE.TextureDataType>;
+
+/** The WebGL extensions that let float buffers of each bit depth be drawn into, any one of which will do. */
+const FLOAT_RENDERING = {
+	16: ["EXT_color_buffer_half_float", "EXT_color_buffer_float"],
+	32: ["EXT_color_buffer_float"],
+} as const;
 
 /** What a restart starts from. */
 export interface StartSettings {
@@ -160,6 +169,9 @@ export class Simulation {
 		this.#current.dispose();
 		this.#next.dispose();
 		if (this.#current.texture.type !== TEXEL_TYPES[start.bit_depth]) {
+			if (start.bit_depth !== 8 && !FLOAT_RENDERING[start.bit_depth].some((name) => this.renderer.extensions.has(name))) {
+				log.warn("this browser can't draw into {bit_depth}-bit float buffers, so the simulation won't run", { bit_depth: start.bit_depth });
+			}
 			this.#current = Simulation.#target(start.bit_depth);
 			this.#next    = Simulation.#target(start.bit_depth);
 		}
@@ -207,14 +219,18 @@ export class Simulation {
 	 * @param from The stroke's start, in pixels from the bottom left.
 	 * @param to Its end.
 	 * @param radius In pixels.
-	 * @param color "#rrggbb".
+	 * @param color "#rrggbb", or a gray from 0 to 1, which isn't rounded to 1/255.
 	 */
-	paint(from: { x: number; y: number }, to: { x: number; y: number }, radius: number, color: string): void {
+	paint(from: { x: number; y: number }, to: { x: number; y: number }, radius: number, color: string | number): void {
 		const u = this.#sim_uniforms;
 		u.prev_frame.value = this.#current.texture;
 		u.stroke.value.set(from.x, from.y, to.x, to.y);
 		u.brush.value = radius;
-		u.paint.value.set(color);
+		if (typeof color === "number") {
+			u.paint.value.setScalar(color);
+		} else {
+			u.paint.value.set(color);
+		}
 		u.painting.value = true;
 		this.renderer.setRenderTarget(this.#next);
 		this.renderer.render(this.#sim_scene, this.#camera);

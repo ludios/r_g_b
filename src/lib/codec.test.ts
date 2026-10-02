@@ -3,7 +3,7 @@ import { assert, boolean, constantFrom, double, integer, property, record, strin
 import { describe, expect, test } from "vitest";
 import { decode, encode } from "./codec";
 import { MAX_SEED, PRESETS, with_delta } from "./kernel";
-import { BIT_DEPTHS, CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, PIXEL_SIZES, SEEDS, SLIDERS, VIEWS } from "./settings";
+import { BIT_DEPTHS, CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, PIXEL_SIZES, SEEDS, SETTINGS_PRESETS, SLIDERS, VIEWS } from "./settings";
 
 // Adding 0 makes -0 a plain 0, which is what the URL can say.
 const slider = (key: keyof typeof SLIDERS) => double({ min: SLIDERS[key].min, max: SLIDERS[key].max, noNaN: true }).map((v) => v + 0);
@@ -55,6 +55,13 @@ describe("codec", () => {
 		expect(decode("k=9&kp=-0.5").progress).toBe(0);
 	});
 
+	test("reads back each settings preset made on the defaults", () => {
+		for (const changes of Object.values(SETTINGS_PRESETS)) {
+			const s = { ...DEFAULT_SETTINGS, ...changes };
+			expect(decode(encode(s, 7)).settings).toEqual(s);
+		}
+	});
+
 	test("writes only the seed for the defaults", () => {
 		expect(encode(DEFAULT_SETTINGS, 7)).toBe("k=7");
 	});
@@ -69,6 +76,8 @@ describe("codec", () => {
 	test("reads junk as the defaults, and numbers past an end as that end", () => {
 		expect(decode("?k=-1&c=pony&mx=everything&m=yes")).toEqual({ settings: DEFAULT_SETTINGS, kernel: null, progress: 0 });
 		expect(decode("").settings).toEqual(DEFAULT_SETTINGS);
+		// f=1 was half-float buffers, before Bit depth.
+		expect(decode("bd=24&f=1").settings).toEqual(DEFAULT_SETTINGS);
 		expect(decode("s=9999&p=-3&k=1.5")).toEqual({ settings: { ...DEFAULT_SETTINGS, spacing: SLIDERS.spacing.max, persistence: -1 }, kernel: null, progress: 0 });
 	});
 });
