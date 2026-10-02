@@ -535,7 +535,7 @@
 						<KernelDiagram kernel={shown} group={group} onstart={remember} onedit={edit_weight} />
 						<GrowthMap model={model} theme={theme.theme} onplant={(fx, fy) => restart({ fx, fy })} ongrow={grow} bind:caption={map_caption} />
 					</div>
-					<p class="muted">{map_caption}</p>
+					<p class="muted map-caption">{map_caption}</p>
 					<div class="tools">
 						<button type="button" onclick={() => travel(done, undone)} disabled={!can_undo}>Undo</button>
 						<button type="button" onclick={() => travel(undone, done)} disabled={!can_redo}>Redo</button>
@@ -760,6 +760,11 @@
 		background: var(--card);
 		padding: 8px 16px 12px;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 0.15), 0 8px 24px rgb(0 0 0 / 0.08);
+	}
+
+	/* Three lines, whatever the map says, so the controls under it stay put. */
+	.map-caption {
+		min-height: 3lh;
 	}
 
 	.prose {

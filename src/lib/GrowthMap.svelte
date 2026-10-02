@@ -143,7 +143,7 @@
 	}
 
 	$effect(() => {
-		caption = hovered !== null ? `Here: ${words(hovered)} Click to start from them; shift-click for a kernel that grows them.`
+		caption = hovered !== null ? `Here: ${words(hovered)} Click: start from them. Shift-click: a kernel that grows them.`
 			: peak !== null ? `Fastest: ${words(peak)}`
 			: map !== null ? "Nothing grows: every pattern fades."
 			: "";
