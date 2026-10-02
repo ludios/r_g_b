@@ -745,6 +745,12 @@
 							{/each}
 						</div>
 					</div>
+					{#if settings.mouse_x === "r_g_b"}
+						<p class="muted">X sets Contrast, rising evenly from 0.8× at the left edge to 3.8× at the right.</p>
+					{/if}
+					{#if settings.mouse_y === "r_g_b"}
+						<p class="muted">Y sets Persistence from 0% at the top to 100% at the bottom, which freezes the image, and Spacing from 0.2 px to a third of the window’s height, at most 256 px. Both double every tenth of the way down.</p>
+					{/if}
 					{#if mouse_frozen(settings.mouse_x, "x") || mouse_frozen(settings.mouse_y, "y")}
 						<p class="muted">Contrast & Drift are left alone for preset or edited kernels.</p>
 					{/if}
