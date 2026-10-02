@@ -29,7 +29,7 @@
 	const storage  = local_storage();
 	const SECTIONS_KEY = "r_g_b-open-sections";
 	/** The card's sections, and whether each starts open. */
-	const SECTIONS = { how: false, presets: true, time: true, start: true, taps: true, kernel: true, pointer: true, view: true };
+	const SECTIONS = { how: false, presets: true, time: true, start: true, taps: true, kernel: true, pointer: true, view: true, ui: true };
 	type Section = keyof typeof SECTIONS;
 	/** Which of the card's sections are open, kept in localStorage. */
 	let open = $state(read_open());
@@ -773,12 +773,6 @@
 							<output>{settings.paint}</output>
 						</label>
 					{/if}
-					<div class="row">
-						<span>Controls</span>
-						<div class="choices">
-							<label><input type="checkbox" bind:checked={fade} /> Fade when the pointer is away</label>
-						</div>
-					</div>
 				</details>
 
 				<details class="section" bind:open={open.view}>
@@ -791,16 +785,25 @@
 						</div>
 					{/each}
 				</details>
-			</form>
 
-			<label class="row">
-				<span>UI theme</span>
-				<select class="wide" value={theme.theme} onchange={(e) => theme.set(parse_theme(e.currentTarget.value))}>
-					{#each THEMES as option (option)}
-						<option value={option}>{THEME_LABELS[option]}</option>
-					{/each}
-				</select>
-			</label>
+				<details class="section" bind:open={open.ui}>
+					<summary>UI</summary>
+					<label class="row">
+						<span>Theme</span>
+						<select class="wide" value={theme.theme} onchange={(e) => theme.set(parse_theme(e.currentTarget.value))}>
+							{#each THEMES as option (option)}
+								<option value={option}>{THEME_LABELS[option]}</option>
+							{/each}
+						</select>
+					</label>
+					<div class="row">
+						<span>Fade controls</span>
+						<div class="choices">
+							<label><input type="checkbox" bind:checked={fade} /> when the pointer is away</label>
+						</div>
+					</div>
+				</details>
+			</form>
 		</section>
 	{/if}
 </div>
@@ -895,12 +898,6 @@
 		border-top: 1px solid var(--rule);
 		margin: 6px 0 0;
 		padding: 4px 0 2px;
-	}
-	/* The card's own rows are parts of it, ruled off like the sections. */
-	.card > .row {
-		border-top: 1px solid var(--rule);
-		margin: 6px 0 0;
-		padding: 6px 0 2px;
 	}
 	summary {
 		cursor: pointer;
