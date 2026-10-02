@@ -23,25 +23,29 @@
 	let next_in    = $state(0);
 	const theme    = new ThemeChoice(local_storage());
 	const storage  = local_storage();
-	const CLOSED_KEY = "r_g_b-closed-sections";
-	const SECTIONS = ["kernel", "taps", "time", "start", "view", "pointer"] as const;
-	/** Which of the card's sections are open; the closed ones are kept in localStorage. */
-	let open = $state(Object.fromEntries(SECTIONS.map((name) => [name, !stored_closed().includes(name)])) as Record<(typeof SECTIONS)[number], boolean>);
+	const SECTIONS_KEY = "r_g_b-open-sections";
+	/** The card's sections, and whether each starts open. */
+	const SECTIONS = { kernel: true, taps: true, time: true, start: true, view: true, pointer: true, how: false };
+	type Section = keyof typeof SECTIONS;
+	/** Which of the card's sections are open, kept in localStorage. */
+	let open = $state(read_open());
 
-	/** The sections stored as closed; none when prerendering, or if storage fails. */
-	function stored_closed(): unknown[] {
+	/** The sections' stored states, or where there are none (as when prerendering), their defaults. */
+	function read_open(): Record<Section, boolean> {
+		let stored: unknown = null;
 		try {
-			const stored: unknown = JSON.parse(storage?.getItem(CLOSED_KEY) ?? "[]");
-			return Array.isArray(stored) ? stored : [];
+			stored = JSON.parse(storage?.getItem(SECTIONS_KEY) ?? "null");
 		} catch {
-			return [];
+			// The defaults, then.
 		}
+		const states = typeof stored === "object" && stored !== null ? (stored as Record<string, unknown>) : {};
+		return Object.fromEntries(Object.entries(SECTIONS).map(([name, initially]) => [name, typeof states[name] === "boolean" ? states[name] : initially])) as Record<Section, boolean>;
 	}
 
 	$effect(() => {
-		const closed = SECTIONS.filter((name) => !open[name]);
+		const states = JSON.stringify(open);
 		try {
-			storage?.setItem(CLOSED_KEY, JSON.stringify(closed));
+			storage?.setItem(SECTIONS_KEY, states);
 		} catch {
 			// Not kept past this page, then.
 		}
@@ -692,6 +696,17 @@
 				</details>
 			</form>
 
+			<details class="section" bind:open={open.how}>
+				<summary>How it works</summary>
+				<div class="prose">
+					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the squares are their weights, hollow if negative. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat.</p>
+					<p>The map estimates what a step multiplies stripes' contrast by, for each spacing and direction (flat in the middle, finer outward), before clipping: shaded where that's over 1, so they grow, and circled where fastest. A step can also shift stripes; half a cycle swaps bright and dark, and near that (hatched) they strobe.</p>
+					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them.</p>
+					<p>Taps are Spacing apart, rounded to whole pixels, so fine stripes can look like wider ones to them, and the map roughly repeats. Jitter gives each pixel its own fixed spacing, blurring the repeats and tending to favor the widest stripes.</p>
+					<p>Red, green and blue follow the rule separately. On dark gray, the red dot raises red and lowers green and blue, so they start opposite: red against cyan.</p>
+				</div>
+			</details>
+
 			<footer class="actions">
 				<button type="button" onclick={() => reset(DEFAULT_SETTINGS)}>Reset settings</button>
 				<button type="button" onclick={() => reset(LIKE_R_G_B)}>Like r_g_b.html</button>
@@ -745,6 +760,14 @@
 		background: var(--card);
 		padding: 8px 16px 12px;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 0.15), 0 8px 24px rgb(0 0 0 / 0.08);
+	}
+
+	.prose {
+		font-size: 12px;
+		line-height: 1.45;
+	}
+	.prose p {
+		margin: 6px 0;
 	}
 
 	.credit {
