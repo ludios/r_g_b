@@ -948,10 +948,10 @@
 		gap: 4px 12px;
 	}
 	/* Choices that share their line in halves, whatever their longest option; a select too long for
-	   its half is cut off until it's opened. 8.5em fits "x: r_g_b.html", so below that they wrap. */
+	   its half is cut off until it's opened. 9em fits "x: r_g_b.html", even in DejaVu Sans, so below that they wrap. */
 	.halves > label {
 		flex: 1 1 0;
-		min-width: 8.5em;
+		min-width: 9em;
 	}
 	/* A line of choices of its own sits as far from the title and its neighbors as a row does,
 	   which is as far as a wrapped line. */
