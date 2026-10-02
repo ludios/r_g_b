@@ -753,7 +753,7 @@
 					<p>A flat ground stays flat, so something has to break it: Noise, a restart from stripes clicked on the Frequency Response map, paint, or the seeds. By default the seeds are a red, a green and a blue dot in a line through the middle, at 1/6, 1/2 and 5/6 of the window's longer side. With stamping on, each step paints them back over its result, so they stay put and keep feeding what grows around them; with it off, they're only where things start, and change like any other pixel.</p>
 					<p>Each step's result is stored at the Bit Depth. At 8 bits every channel is rounded to one of 256 levels, so a change of less than half a level is lost: a blur slows as it spreads, then stops, leaving a soft trace of what it blurred. 16-bit and 32-bit floats round far more finely, so a blur gets much flatter before it stops (at 32, too flat to see), for more memory and time per step.</p>
 					<p>Red, green and blue follow the rule separately. On dark gray, the red dot raises red and lowers green and blue, so they start opposite: red against cyan.</p>
-					<p>When no control has focus, Space pauses and plays, Enter steps while paused, Z undoes a change to the kernel and Shift-Z redoes it.</p>
+					<p>When no control has focus, Space pauses and plays, Enter steps while paused, Z undoes a change to the kernel and Shift-Z redoes it. On the Hinton Diagram, the arrow keys choose a tap and typing a number sets it.</p>
 				</div>
 			</details>
 

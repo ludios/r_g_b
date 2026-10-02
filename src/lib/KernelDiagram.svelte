@@ -3,11 +3,11 @@
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
 	// screen, whose area is the weight's size, filled if positive and hollow if negative; past 1
 	// either way, the square fills its cell in the accent color. Dragging
-	// a square up or down changes its weight, and clicking one gives a field to type it in; the
-	// taps that change with it are outlined. The middle tap is whatever makes the sum 1, so it
-	// follows the others rather than being edited itself.
+	// a square up or down changes its weight, and clicking one, or choosing it with the arrow keys,
+	// gives a field to type it in; the taps that change with it are outlined. The middle tap is
+	// whatever makes the sum 1, so it follows the others rather than being edited itself.
 	import { tick } from "svelte";
-	import { type Group, type Kernel, MIDDLE, TAPS, group_of, reweighted, tap_offset } from "./kernel";
+	import { type Group, type Kernel, MIDDLE, TAPS, group_of, index_of, reweighted, tap_offset } from "./kernel";
 
 	interface Props {
 		kernel: Kernel;
@@ -31,6 +31,8 @@
 	const SLOP = { mouse: 3, other: 10 };
 	/** The most a typed weight can be either way; past 1 or so, it only floods the screen. */
 	const MOST = 10;
+	/** Which way each arrow key moves the selection across the taps; up is +y. */
+	const ARROWS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
 
 	/** The tap pointed at, if any. */
 	let hover    = $state<number | null>(null);
@@ -44,6 +46,9 @@
 	 */
 	let draft    = $state<{ text: string; typed: boolean } | null>(null);
 	let field    = $state<HTMLInputElement>();
+	let diagram  = $state<SVGSVGElement>();
+	/** Whether the diagram itself has focus, so the arrow keys choose taps. */
+	let focused  = $state(false);
 	/**
 	 * The tap pressed, by which pointer, and where; once it's moved far enough to be a drag, where
 	 * that started, the kernel then, and the kernel it last made.
@@ -95,7 +100,7 @@
 		}
 		take_draft();
 		event.preventDefault();
-		(event.currentTarget as Element).closest("svg")!.setPointerCapture(event.pointerId);
+		diagram!.setPointerCapture(event.pointerId);
 		press = { pointer: event.pointerId, index, y: event.clientY, from: null, last: null };
 	}
 
@@ -146,11 +151,50 @@
 			// On a touchscreen, focus would put up a keyboard over the screen.
 			if (event.pointerType === "mouse" && selected !== null) {
 				hold();
-				void tick().then(() => field?.select());
+				void tick().then(edit_field);
 			}
 		}
 		press   = null;
 		dragged = null;
+	}
+
+	/** Puts the focus in the field, its text selected, so what's typed replaces it. */
+	function edit_field(): void {
+		field?.focus();
+		field?.select();
+	}
+
+	/**
+	 * The tap an arrow key goes to from tap `from` by `dx`, `dy`: the next one that way, stepping
+	 * over the middle, which can't be selected, or `from` itself at the edge.
+	 */
+	function step(from: number, dx: number, dy: number): number {
+		let { x, y } = tap_offset(from);
+		do {
+			x += dx;
+			y += dy;
+		} while (x === 0 && y === 0);
+		return Math.abs(x) > 2 || Math.abs(y) > 2 ? from : index_of(x, y);
+	}
+
+	/**
+	 * On the diagram, the arrow keys choose a tap, starting from the middle; Enter, or the start of a
+	 * number, goes to its field (the keystroke lands there); Escape unselects it.
+	 */
+	function on_diagram_key(event: KeyboardEvent): void {
+		const arrow = ARROWS[event.key];
+		if (arrow !== undefined) {
+			event.preventDefault();
+			selected = step(selected ?? MIDDLE, ...arrow);
+		} else if (selected !== null && event.key === "Enter") {
+			event.preventDefault();
+			event.stopPropagation(); // Not a step
+			edit_field();
+		} else if (selected !== null && /^[\d.-]$/.test(event.key)) {
+			edit_field();
+		} else if (event.key === "Escape") {
+			selected = null;
+		}
 	}
 
 	/** Holds the field's text still, at the selected tap's weight. */
@@ -185,23 +229,27 @@
 		draft = null;
 	}
 
-	/** Enter takes what's typed, and Escape drops it and closes the field. */
+	/** Enter takes what's typed, and Escape drops it and goes back to the diagram, the tap still selected. */
 	function on_field_key(event: KeyboardEvent): void {
 		if (event.key === "Enter") {
 			event.preventDefault();
 			take_draft();
 			hold();
 		} else if (event.key === "Escape") {
-			draft    = null;
-			selected = null;
+			draft = null;
+			diagram?.focus();
 		}
 	}
 </script>
 
 <figure>
 	<div class="figure-title">Hinton diagram</div>
-	<svg viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} role="img" aria-label="The kernel's 25 weights"
-		onpointermove={move} onpointerup={release} onpointercancel={release} onpointerleave={() => (hover = null)}>
+	<!-- An application role, as it handles its own keys; svelte-check doesn't count that as interactive. -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+	<svg bind:this={diagram} viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} tabindex="0" role="application"
+		aria-label="The kernel's 25 weights: the arrow keys choose a tap, and a number sets it"
+		onpointermove={move} onpointerup={release} onpointercancel={release} onpointerleave={() => (hover = null)}
+		onkeydown={on_diagram_key} onfocus={() => (focused = true)} onblur={() => (focused = false)}>
 		{#each { length: TAPS } as _, i (i)}
 			{@const { x, y } = cell(i)}
 			{@const w = kernel[i]!}
@@ -216,7 +264,7 @@
 	<figcaption>
 		<div class="line">
 			{#if subject === null}
-				Drag or click to edit.
+				{focused ? "Arrows choose a tap." : "Drag or click to edit."}
 			{:else if subject === selected}
 				{offset(subject)}
 				<input bind:this={field} type="number" step="0.001" min={-MOST} max={MOST} value={draft?.text ?? format(kernel[subject]!)}

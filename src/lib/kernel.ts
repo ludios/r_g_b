@@ -164,7 +164,7 @@ export function with_drift(kernel: Kernel, drift: number): Kernel {
 }
 
 /** The index of the tap at `x`, `y`, each from -2 to 2. */
-function index_of(x: number, y: number): number {
+export function index_of(x: number, y: number): number {
 	return (y + 2) * 5 + (x + 2);
 }
 
