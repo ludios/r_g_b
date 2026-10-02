@@ -2,7 +2,7 @@
 import { assert, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
 import { PRESETS, TAPS, gen_kernel, seeded_kernel } from "./kernel";
-import { type StepModel, fastest, growth_map, motion, multiplier } from "./spectrum";
+import { type StepModel, fastest, growth_map, mode_at, motion, multiplier } from "./spectrum";
 
 /** `n` modulo `m`, in [0, m) even for negative `n`. */
 function wrap(n: number, m: number): number {
@@ -63,15 +63,30 @@ describe("multiplier", () => {
 	});
 });
 
+describe("growth_map", () => {
+	test("is the multiplier at each point", () => {
+		assert(property(integer({ min: 0, max: 1000 }), double({ min: 1, max: 50, noNaN: true }), double({ min: 0, max: 0.25, noNaN: true }),
+			double({ min: 0, max: 1, noNaN: true }), integer({ min: 0, max: 21 * 21 - 1 }), (seed, spacing, jitter, persistence, index) => {
+				const model: StepModel = { kernel: seeded_kernel(seed), spacing, jitter, persistence };
+				const mode = mode_at(growth_map(model, 21), index);
+				const exact = multiplier(model, mode.fx, mode.fy);
+				expect(mode.growth).toBeCloseTo(exact.growth, 9);
+				expect(Math.cos(mode.phase) * mode.growth).toBeCloseTo(Math.cos(exact.phase) * exact.growth, 9);
+				expect(Math.sin(mode.phase) * mode.growth).toBeCloseTo(Math.sin(exact.phase) * exact.growth, 9);
+			}));
+	});
+});
+
 describe("motion", () => {
 	test("a shift moves every wave one tap a step", () => {
 		const map = growth_map({ kernel: PRESETS.shift, spacing: 10, jitter: 0, persistence: 0 }, 21);
-		for (const mode of map.modes) {
+		const modes = Array.from(map.growth, (_, i) => mode_at(map, i));
+		for (const mode of modes) {
 			expect(mode.growth).toBeCloseTo(1, 12);
 		}
 		// 10 px along x is 10 fx cycles of the wave, or as much less as a whole number of cycles
 		// makes it: a move of a whole cycle looks like none. Near half a cycle it inverts.
-		const moving = map.modes
+		const moving = modes
 			.map((mode) => ({ mode, cycles: Math.abs(10 * mode.fx - Math.round(10 * mode.fx)) }))
 			.filter(({ mode, cycles }) => Math.hypot(mode.fx, mode.fy) > 0 && cycles < 0.45);
 		expect(moving.length).toBeGreaterThan(100);

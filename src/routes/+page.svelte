@@ -28,8 +28,8 @@
 	// The page is prerendered with some kernel; the URL's, or a random one, takes over once mounted.
 	const kernels = new Kernels(0);
 	/** The kernels' source and kernel as reactive state, which sync() updates. */
-	let source    = $state<Source>(kernels.source);
-	let base      = $state<Kernel>(kernels.kernel);
+	let source    = $state.raw<Source>(kernels.source);
+	let base      = $state.raw<Kernel>(kernels.kernel);
 	/** The last random kernel, which choosing Random goes back to; the current one while random. */
 	let last_seed: number | null = null;
 	/** The kernel the step uses: the base, with the drift and contrast applied. */
@@ -90,8 +90,14 @@
 		return from.kind === "seed" ? from.seed : from.kind === "preset" ? from.name : kernel;
 	}
 
+	/** When sync() last ran, in performance.now() milliseconds. */
+	let synced_at = 0;
+	/** How often a morphing kernel is shown: more often would redraw the diagram and map for little. */
+	const SYNC_MS = 100;
+
 	/** Copies the kernels' state to the page's. */
 	function sync(): void {
+		synced_at = performance.now();
 		source  = kernels.source;
 		base    = kernels.kernel;
 		next_in = Math.ceil((1 - kernels.progress) * settings.morph_steps);
@@ -193,7 +199,7 @@
 			for (let i = 0; i < count; i++) {
 				step();
 			}
-			if (count > 0) {
+			if (count > 0 && (kernels.source !== source || performance.now() - synced_at >= SYNC_MS)) {
 				sync();
 			}
 			frame++;

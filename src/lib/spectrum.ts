@@ -32,8 +32,9 @@ export interface GrowthMap {
 	/** The grid has size x size points, from -reach to reach; size is odd, so f = 0 is the middle. */
 	size: number;
 	reach: number;
-	/** Row-major, row 0 at fy = +reach (the top), column 0 at fx = -reach. */
-	modes: Mode[];
+	/** |M| and arg M at each point, row-major, row 0 at fy = +reach (the top), column 0 at fx = -reach. */
+	growth: Float64Array;
+	phase: Float64Array;
 }
 
 /** sin(x) / x, 1 at 0. */
@@ -70,19 +71,76 @@ export function multiplier(model: StepModel, fx: number, fy: number): Mode {
  * M around f = 0, far enough to show the taps' aliases: with taps s pixels apart, stripes with f and
  * f + 1/s cycles per pixel land on the taps alike, so without jitter M repeats every 1/s. The map
  * reaches 1.5/s, three repeats across, or the finest stripes pixels can show, if that's nearer.
+ * It's what `multiplier` gives at each point, but from tables, since it's 25 taps at each of
+ * size^2 points, several times a second while the kernel morphs.
  * @param size The grid's points across, odd.
  */
 export function growth_map(model: StepModel, size: number): GrowthMap {
 	A.eq(size % 2, 1);
-	const reach = Math.min(0.5, 1.5 / model.spacing);
+	A.eq(model.kernel.length, TAPS);
+	const { kernel, spacing, jitter } = model;
+	const reach = Math.min(0.5, 1.5 / spacing);
 	const half  = (size - 1) / 2;
-	const modes: Mode[] = [];
-	for (let row = 0; row < size; row++) {
-		for (let column = 0; column < size; column++) {
-			modes.push(multiplier(model, ((column - half) / half) * reach, ((half - row) / half) * reach));
+	const step  = reach / half; // Cycles per pixel from one point to the next
+	const p     = Math.min(1, Math.max(0, model.persistence));
+
+	// The phase each tap's offset gives a wave, per axis: at column or row k (from -half to half)
+	// and tap d (from -2 to 2), 2 pi k step floor(0.5 + spacing d).
+	const cos = new Float64Array(size * 5);
+	const sin = new Float64Array(size * 5);
+	for (let k = -half; k <= half; k++) {
+		for (let d = -2; d <= 2; d++) {
+			const angle = 2 * Math.PI * k * step * Math.floor(0.5 + spacing * d);
+			cos[(k + half) * 5 + d + 2] = Math.cos(angle);
+			sin[(k + half) * 5 + d + 2] = Math.sin(angle);
 		}
 	}
-	return { size, reach, modes };
+	// The jitter's damping depends on f . d, which is step times a whole number from -4 half to
+	// 4 half.
+	const damp = new Float64Array(8 * half + 1);
+	for (let n = -4 * half; n <= 4 * half; n++) {
+		damp[n + 4 * half] = sinc(2 * Math.PI * jitter * spacing * step * n);
+	}
+
+	const growth = new Float64Array(size * size);
+	const phase  = new Float64Array(size * size);
+	for (let row = 0; row < size; row++) {
+		const ky = half - row;
+		for (let column = 0; column < size; column++) {
+			const kx = column - half;
+			let re = 0;
+			let im = 0;
+			for (let dy = -2; dy <= 2; dy++) {
+				const cy = cos[(ky + half) * 5 + dy + 2]!;
+				const sy = sin[(ky + half) * 5 + dy + 2]!;
+				for (let dx = -2; dx <= 2; dx++) {
+					const w  = kernel[(dy + 2) * 5 + dx + 2]! * damp[kx * dx + ky * dy + 4 * half]!;
+					const cx = cos[(kx + half) * 5 + dx + 2]!;
+					const sx = sin[(kx + half) * 5 + dx + 2]!;
+					re += w * (cx * cy - sx * sy);
+					im += w * (sx * cy + cx * sy);
+				}
+			}
+			const i = row * size + column;
+			re = p + (1 - p) * re;
+			im = (1 - p) * im;
+			growth[i] = Math.hypot(re, im);
+			phase[i]  = Math.atan2(im, re);
+		}
+	}
+	return { size, reach, growth, phase };
+}
+
+/** The map's point `index` as a mode. */
+export function mode_at(map: GrowthMap, index: number): Mode {
+	const half = (map.size - 1) / 2;
+	const step = map.reach / half;
+	return {
+		fx:     ((index % map.size) - half) * step,
+		fy:     (half - Math.floor(index / map.size)) * step,
+		growth: map.growth[index]!,
+		phase:  map.phase[index]!,
+	};
 }
 
 /**
@@ -90,20 +148,24 @@ export function growth_map(model: StepModel, size: number): GrowthMap {
  * those growing as fast, the widest. Null if nothing grows.
  */
 export function fastest(map: GrowthMap): Mode | null {
-	const least = (2 * map.reach) / (map.size - 1); // One grid step from f = 0
-	let best: Mode | null = null;
-	for (const mode of map.modes) {
-		const f = Math.hypot(mode.fx, mode.fy);
-		if (f < least * 1.5 || mode.growth <= 1 + 1e-9) {
+	const half = (map.size - 1) / 2;
+	let best: number | null = null;
+	let best_f = 0;
+	for (let i = 0; i < map.growth.length; i++) {
+		const g = map.growth[i]!;
+		// In grid steps from the middle; the points next to it are too near flat to count.
+		const f = Math.hypot((i % map.size) - half, half - Math.floor(i / map.size));
+		if (f < 1.5 || g <= 1 + 1e-9) {
 			continue;
 		}
-		const faster = best === null || mode.growth > best.growth + 1e-9;
-		const as_fast_but_wider = best !== null && mode.growth > best.growth - 1e-9 && f < Math.hypot(best.fx, best.fy);
+		const faster = best === null || g > map.growth[best]! + 1e-9;
+		const as_fast_but_wider = best !== null && g > map.growth[best]! - 1e-9 && f < best_f;
 		if (faster || as_fast_but_wider) {
-			best = mode;
+			best = i;
+			best_f = f;
 		}
 	}
-	return best;
+	return best === null ? null : mode_at(map, best);
 }
 
 /** A mode in pixels: how far apart its stripes are, and how far a step moves them. */

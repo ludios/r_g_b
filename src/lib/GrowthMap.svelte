@@ -4,7 +4,7 @@
 	// farther out, and across the direction it lies in. Growing waves are shaded in the accent, more
 	// for faster; a hairline rings them; hatching marks those that invert each step. With jitter,
 	// the copies of the middle square, which the taps can't tell from it, fade.
-	import { type GrowthMap, type Mode, type StepModel, fastest, growth_map, motion } from "./spectrum";
+	import { type GrowthMap, type Mode, type StepModel, fastest, growth_map, mode_at, motion } from "./spectrum";
 
 	interface Props {
 		model: StepModel;
@@ -23,7 +23,8 @@
 	const EVERY_MS = 100;
 
 	let canvas: HTMLCanvasElement;
-	let map     = $state<GrowthMap | null>(null);
+	// Raw: a deep proxy over its arrays would make every read slow.
+	let map     = $state.raw<GrowthMap | null>(null);
 	let hovered = $state<Mode | null>(null);
 	const peak  = $derived(map === null ? null : fastest(map));
 	let last    = 0;
@@ -45,29 +46,43 @@
 		return (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
 	}
 
+	interface Palette {
+		card: number[];
+		accent: number[];
+		text: number[];
+		rule: string;
+	}
+
+	/** The palette, and what it was read for: the theme setting and the browser's preference. */
+	let cached: { key: string; palette: Palette } | null = null;
+
 	/** The page's palette, resolved: the canvas's CSS borrows properties to carry it. */
-	function palette(): { card: number[]; accent: number[]; text: number[]; rule: string } {
-		const style = getComputedStyle(canvas);
-		return { card: rgb(style.backgroundColor), accent: rgb(style.color), text: rgb(style.caretColor), rule: style.outlineColor };
+	function palette(): Palette {
+		const key = `${theme} ${matchMedia("(prefers-color-scheme: dark)").matches}`;
+		if (cached?.key !== key) {
+			const style = getComputedStyle(canvas);
+			cached = { key, palette: { card: rgb(style.backgroundColor), accent: rgb(style.color), text: rgb(style.caretColor), rule: style.outlineColor } };
+		}
+		return cached.palette;
 	}
 
 	function draw(m: GrowthMap): void {
 		const { card, accent, text, rule } = palette();
 		const ctx   = canvas.getContext("2d")!;
 		const image = ctx.createImageData(SIZE, SIZE);
-		const grows = (i: number) => m.modes[i]!.growth > 1;
+		const grows = (i: number) => m.growth[i]! > 1;
 		for (let row = 0; row < SIZE; row++) {
 			for (let column = 0; column < SIZE; column++) {
 				const i    = row * SIZE + column;
-				const mode = m.modes[i]!;
+				const growth = m.growth[i]!;
 				let color  = card;
 				const edge = (column + 1 < SIZE && grows(i + 1) !== grows(i)) || (row + 1 < SIZE && grows(i + SIZE) !== grows(i));
 				if (edge) {
 					color = text;
-				} else if (mode.growth > 1) {
+				} else if (growth > 1) {
 					// Any growth shows; ×4 a step or more is the full accent.
-					const t = 0.25 + 0.75 * Math.min(1, Math.log(mode.growth) / Math.log(4));
-					const hatched = Math.abs(mode.phase) > Math.PI / 2 && (row + column) % 4 === 0;
+					const t = 0.25 + 0.75 * Math.min(1, Math.log(growth) / Math.log(4));
+					const hatched = Math.abs(m.phase[i]!) > Math.PI / 2 && (row + column) % 4 === 0;
 					color = mix(card, accent, hatched ? t * 0.35 : t);
 				}
 				image.data.set([...color, 255], i * 4);
@@ -113,7 +128,7 @@
 		const box    = canvas.getBoundingClientRect();
 		const column = Math.round(((event.clientX - box.left) / box.width) * SIZE - 0.5);
 		const row    = Math.round(((event.clientY - box.top) / box.height) * SIZE - 0.5);
-		return map.modes[Math.min(SIZE - 1, Math.max(0, row)) * SIZE + Math.min(SIZE - 1, Math.max(0, column))] ?? null;
+		return mode_at(map, Math.min(SIZE - 1, Math.max(0, row)) * SIZE + Math.min(SIZE - 1, Math.max(0, column)));
 	}
 
 	/** A mode in words: its stripes' spacing, growth and motion. */
