@@ -114,8 +114,8 @@ export const DEFAULT_SETTINGS: Settings = {
 
 /** Changes to make to the settings, leaving the rest as they are, by name. */
 export const SETTINGS_PRESETS = {
-	/** The mouse lets go, so what it set stays put. */
-	still: { mouse_x: null, mouse_y: null },
+	/** The mouse lets go, so what it set stays put, and clicks do nothing. */
+	still: { mouse_x: null, mouse_y: null, click: "none" },
 	/** Restarts from noise everywhere, so the kernel's stripes grow all over at once. */
 	noise: { seeds: "none", noise: 0.05 },
 	/** Restarts from one white dot, which grows the same in every channel: black and white. */
