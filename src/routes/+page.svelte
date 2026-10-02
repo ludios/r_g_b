@@ -482,7 +482,7 @@
 	}
 
 	const MOUSE_LABELS:  Record<MouseTarget, string> = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence",
-		spacing_persistence: "Spacing + persistence", r_g_b: "As r_g_b.html" };
+		spacing_persistence: "Spacing + persistence", r_g_b: "r_g_b.html" };
 	const CLICK_LABELS:  Record<Click, string>  = { kernel: "New kernel", paint: "Paint", erase: "Erase", taps: "Show taps" };
 	const PRESET_LABELS: Record<Preset, string> = {
 		identity: "Identity", box: "Box blur", shift: "Shift", lean: "Lean", skip: "Every other tap",
@@ -733,7 +733,7 @@
 					<summary>Pointer</summary>
 					<div class="row">
 						<span>Mouse</span>
-						<div class="choices">
+						<div class="choices halves">
 							{#each [["X", "mouse_x"], ["Y", "mouse_y"]] as const as [axis, key] (key)}
 								<label>{axis} <select bind:value={settings[key]}>
 									<option value={null}>nothing</option>
@@ -944,6 +944,16 @@
 		align-items: baseline;
 		gap: 4px 12px;
 		font-size: 12px;
+	}
+	/* Choices that share their line in halves, whatever their longest option; a select too long for
+	   its half is cut off until it's opened. They wrap only when a half couldn't show a short one. */
+	.halves > label {
+		flex: 1 1 0;
+		min-width: 8.5em;
+	}
+	.halves select {
+		flex: 1;
+		min-width: 0;
 	}
 	/* A line of choices of its own sits as far from the title and its neighbors as a row does,
 	   which is as far as a wrapped line. */
