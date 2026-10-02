@@ -704,6 +704,7 @@
 					</select>
 				</label>
 			</footer>
+			<p class="credit">This is a clanked, refried, educational version of <a href="https://vbuckenham.com/">v buckenham</a>'s amazing <a href="https://v21.io/r_g_b.html">r_g_b.html</a>.</p>
 		</section>
 	{/if}
 </div>
@@ -744,6 +745,12 @@
 		background: var(--card);
 		padding: 8px 16px 12px;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 0.15), 0 8px 24px rgb(0 0 0 / 0.08);
+	}
+
+	.credit {
+		margin: 8px 0 0;
+		font-size: 12px;
+		color: var(--text-muted);
 	}
 
 	.muted {
