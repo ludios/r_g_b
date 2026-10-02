@@ -641,14 +641,14 @@
 							aria-valuetext="{(settings.jitter * 100).toFixed(1)}%" />
 						<output>±{(settings.jitter * 100).toFixed(1)}%</output>
 					</label>
-					<!-- Only the name is a label, for the slider: a label may hold just the one control. -->
+					<!-- Only the name labels the slider, so the 0 button's text stays out of the slider's name. -->
 					<div class="row">
-						<label for="persistence">Persistence</label>
-						<input id="persistence" type="range" min="0" max={SLIDERS.persistence.positions} value={position_of(SLIDERS.persistence, settings.persistence)} oninput={(e) => slide("persistence", e)}
+						<label for="persistence-slider">Persistence</label>
+						<input id="persistence-slider" type="range" min="0" max={SLIDERS.persistence.positions} value={position_of(SLIDERS.persistence, settings.persistence)} oninput={(e) => slide("persistence", e)}
 							aria-valuetext="{(settings.persistence * 100).toFixed(1)}%" />
-						<div class="zeroable">
+						<div class="readout">
 							<button type="button" onclick={() => (settings.persistence = 0)} aria-label="Persistence to 0">0</button>
-							<output>{(settings.persistence * 100).toFixed(1)}%</output>
+							<output for="persistence-slider">{(settings.persistence * 100).toFixed(1)}%</output>
 						</div>
 					</div>
 				</details>
@@ -909,7 +909,7 @@
 		align-items: center;
 		margin: 4px 0;
 	}
-	.row > span:first-child, .row > label:first-child, .row > .check {
+	.row > :first-child, .row > .check {
 		font-size: 12px;
 	}
 	/* A row of choices has no readout, so it runs to the edge. */
@@ -1019,21 +1019,23 @@
 		gap: 4px;
 		margin: 4px 0 6px;
 	}
-	.tools button, .presets button, .zeroable button {
+	.tools button, .presets button, .readout button {
 		padding: 0 7px;
 		font-size: 12px;
+	}
+	.tools button, .presets button {
 		line-height: 20px;
 	}
-	/* A readout led by a button that puts a two-sided slider back to its middle, which a drag can't
-	   easily land on; the slider keeps its full width. */
-	.zeroable {
+	/* A readout led by a button that puts its slider back to the middle of a two-sided range, which a
+	   drag can't easily land on. */
+	.readout {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 6px;
 	}
-	/* No taller than a slider's row. */
-	.zeroable button {
+	/* As tall as a slider's thumb, so the row is as tall as the others. */
+	.readout button {
 		line-height: 16px;
 	}
 
