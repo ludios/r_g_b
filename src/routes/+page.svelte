@@ -531,7 +531,7 @@
 
 	{#if show_card}
 		<section class="card">
-			<p class="credit">The shader here is not my work or idea; it is <a href="https://vbuckenham.com/">v buckenham</a>'s amazing <a href="https://v21.io/r_g_b.html">r_g_b.html</a>, remixed here for educational purposes.</p>
+			<p class="credit">The shader here is not my work or idea; it is <a href="https://vbuckenham.com/">v buckenham</a>'s excellent <a href="https://vbuckenham.com/images/rgb.html">r_g_b</a>, remixed here for educational purposes.</p>
 			<p class="credit">Source: <a href="https://github.com/ludios/r_g_b">github.com/ludios/r_g_b</a></p>
 			<details class="section" bind:open={open.how}>
 				<summary>How it works (this is partly slop)</summary>
