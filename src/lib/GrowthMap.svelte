@@ -4,6 +4,7 @@
 	// farther out, and across the direction it lies in. Growing waves are shaded in the accent, more
 	// for faster; a hairline rings them; hatching marks those that invert each step. With jitter,
 	// the copies of the middle square, which the taps can't tell from it, fade.
+	import { onMount } from "svelte";
 	import { type GrowthMap, type Mode, type StepModel, fastest, growth_map, inverts, mode_at, motion } from "./spectrum";
 
 	interface Props {
@@ -30,17 +31,34 @@
 	/** The point under the pointer, if any, read from the map as it's redrawn. */
 	let pointed = $state<number | null>(null);
 	const hovered = $derived(map === null || pointed === null ? null : mode_at(map, pointed));
-	const peak  = $derived(map === null ? null : fastest(map));
+	/** The map's fastest stripes, found as it's made. */
+	let peak    = $state.raw<Mode | null>(null);
 	let last    = 0;
+	/** Counts the browser's light/dark switches, which the map's colors follow when the theme does. */
+	let schemes = $state(0);
+
+	function scheme_changed(): void {
+		schemes++;
+	}
+
+	onMount(() => {
+		const query = matchMedia("(prefers-color-scheme: dark)");
+		query.addEventListener("change", scheme_changed);
+		return () => query.removeEventListener("change", scheme_changed);
+	});
 
 	$effect(() => {
 		const current = model;
 		void theme;
+		void schemes;
 		const wait  = Math.max(0, last + EVERY_MS - performance.now());
 		const timer = setTimeout(() => {
 			last = performance.now();
-			map  = growth_map(current, SIZE);
-			draw(map);
+			const made = growth_map(current, SIZE);
+			const best = fastest(made);
+			map  = made;
+			peak = best;
+			draw(made, best, current.spacing);
 		}, wait);
 		return () => clearTimeout(timer);
 	});
@@ -70,7 +88,11 @@
 		return cached.palette;
 	}
 
-	function draw(m: GrowthMap): void {
+	/**
+	 * Draws the map, ringing the fastest stripes and outlining the middle square.
+	 * @param spacing The tap spacing the map was made for.
+	 */
+	function draw(m: GrowthMap, best: Mode | null, spacing: number): void {
 		const { card, accent, text, rule } = palette();
 		const ctx   = canvas.getContext("2d")!;
 		const image = ctx.createImageData(SIZE, SIZE);
@@ -89,7 +111,10 @@
 					const hatched = inverts(m.phase[i]!) && (row + column) % 4 === 0;
 					color = mix(card, accent, hatched ? t * 0.35 : t);
 				}
-				image.data.set([...color, 255], i * 4);
+				image.data[i * 4]     = color[0]!;
+				image.data[i * 4 + 1] = color[1]!;
+				image.data[i * 4 + 2] = color[2]!;
+				image.data[i * 4 + 3] = 255;
 			}
 		}
 		ctx.putImageData(image, 0, 0);
@@ -99,7 +124,7 @@
 		ctx.strokeStyle = rule;
 		ctx.lineWidth = 1;
 		// The middle square: the copies beyond it are the same stripes to the taps.
-		const square = px(0.5 / model.spacing);
+		const square = px(0.5 / spacing);
 		if (square < half) {
 			ctx.strokeRect(half - square + 0.5, half - square + 0.5, 2 * square, 2 * square);
 		}
@@ -109,7 +134,6 @@
 		ctx.moveTo(half - 3, half + 0.5);
 		ctx.lineTo(half + 4, half + 0.5);
 		ctx.stroke();
-		const best = fastest(m);
 		if (best !== null) {
 			ctx.strokeStyle = `rgb(${text.join(",")})`;
 			for (const sign of [1, -1]) {
