@@ -2,11 +2,11 @@
 <script lang="ts">
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
 	// screen, whose area is the weight's size, filled if positive and hollow if negative. Past 1
-	// either way, the square fills its cell to the edge, in the accent color but for the middle
-	// tap's; its outline is the accent already. Dragging a square up or down changes its weight,
-	// and clicking one, or choosing it with the arrow keys, gives a field to type it in; the taps
-	// that change with it are outlined, it more heavily. The middle tap is whatever makes the sum 1,
-	// so it follows the others rather than being edited itself.
+	// either way, the square fills its cell to the edge, in the accent color. Dragging a square up
+	// or down changes its weight, and clicking one, or choosing it with the arrow keys, gives a
+	// field to type it in; the taps that change with it are outlined, it more heavily. The middle
+	// tap, outlined with dashes, is whatever makes the sum 1, so it follows the others rather than
+	// being edited itself.
 	import { tick } from "svelte";
 	import { type Group, type Kernel, MIDDLE, TAPS, group_of, neighbor_tap, reweighted, tap_offset } from "./kernel";
 
@@ -279,7 +279,7 @@
 				{offset(subject)}: {format(kernel[subject]!)}
 			{/if}
 		</div>
-		<div class="line"><span class="accent">Middle</span>: 1 − the rest.</div>
+		<div class="line">Middle: 1 − the rest.</div>
 	</figcaption>
 </figure>
 
@@ -309,8 +309,10 @@
 		stroke: var(--text);
 		pointer-events: none;
 	}
+	/* Dashed, as it's worked out rather than set. */
 	.outline.middle {
-		stroke: var(--accent);
+		stroke: var(--text-muted);
+		stroke-dasharray: 3 2;
 	}
 	.outline.subject {
 		stroke-width: 2;
@@ -323,11 +325,10 @@
 		stroke: var(--text);
 		stroke-width: 1.5;
 	}
-	/* The middle tap's outline is the accent already. */
-	.tap:not(.middle) > .weight.over {
+	.weight.over {
 		fill: var(--accent);
 	}
-	.tap:not(.middle) > .weight.over.negative {
+	.weight.over.negative {
 		fill: none;
 		stroke: var(--accent);
 	}
@@ -343,9 +344,6 @@
 		align-items: center;
 		height: 17px;
 		white-space: nowrap;
-	}
-	.accent {
-		color: var(--accent);
 	}
 	/* While the keyboard has the diagram, the hint is for the arrow keys. */
 	.keys-hint, figure:has(svg:focus-visible) .pointer-hint {

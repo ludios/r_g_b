@@ -552,8 +552,8 @@
 					<p>With <strong>Stamped every step</strong> on, the seeds are redrawn after each step. They stay put and keep feeding the pattern around them. With it off, they are drawn only at the start, then change like any other pixels.</p>
 					<p>Red, green and blue are processed separately. Against a dark-gray background, a red dot raises the red channel but lowers green and blue. That starts the channels in opposition: red against cyan.</p>
 					<h3>Editing the kernel</h3>
-					<p>The <strong>Hinton Diagram</strong> shows the 25 weights. Hollow squares are negative. Bronze means a weight is greater than 1 or less than −1, except in the middle square, whose outline is always bronze.</p>
-					<p>Drag a square or type a value to change a weight. The middle weight adjusts to keep the total at 1, preserving flat colors.</p>
+					<p>The <strong>Hinton Diagram</strong> shows the 25 weights. Hollow squares are negative, and bronze ones are greater than 1 or less than −1.</p>
+					<p>Drag a square or type a value to change a weight. The middle one, outlined with dashes, adjusts to keep the total at 1, preserving flat colors.</p>
 					<p>The taps’ offsets from the pixel run from −2 to 2 on each axis, multiplied by <strong>Spacing</strong>, with the resulting positions rounded to whole pixels. Because the filter reads only at these positions, fine stripes can look like wider ones to it. This is why the Frequency Response map roughly repeats.</p>
 					<p><strong>Jitter</strong> gives each pixel a different spacing, fixed over time. This blurs the repeats and tends to favor the widest stripes.</p>
 					<p><strong>Contrast</strong> scales each weight’s difference from 1/25. That is the weight every tap would have in an equal average.</p>
