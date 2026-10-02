@@ -3,6 +3,8 @@
 // The simulation on the GPU: ping-pong buffers, the step shader, and drawing to the canvas.
 import * as THREE from "three";
 import type { Kernel } from "./kernel";
+import { VIEWS, type View } from "./settings";
+import screen_shader from "./screen.frag?raw";
 import sim_shader from "./sim.frag?raw";
 
 /** What one step of the simulation does, besides convolving with the kernel. */
@@ -55,7 +57,11 @@ export class Simulation {
 		jitter:      { value: 0 },
 		persistence: { value: 0 },
 	};
-	#screen_material = new THREE.MeshBasicMaterial();
+	#screen_uniforms = {
+		current:  { value: null as THREE.Texture | null },
+		previous: { value: null as THREE.Texture | null },
+		view:     { value: 0 },
+	};
 	#screen_scene: THREE.Scene;
 	#sim_scene:    THREE.Scene;
 	// Ping-pong buffers; current holds the latest frame. restart() sizes them.
@@ -73,7 +79,8 @@ export class Simulation {
 		const quad = new THREE.PlaneGeometry(2, 2);
 		const sim_material = new THREE.ShaderMaterial({ uniforms: this.#sim_uniforms, fragmentShader: sim_shader });
 		this.#sim_scene    = new THREE.Scene().add(new THREE.Mesh(quad, sim_material));
-		this.#screen_scene = new THREE.Scene().add(new THREE.Mesh(quad, this.#screen_material));
+		const screen_material = new THREE.ShaderMaterial({ uniforms: this.#screen_uniforms, fragmentShader: screen_shader });
+		this.#screen_scene = new THREE.Scene().add(new THREE.Mesh(quad, screen_material));
 
 		// The step reads whole texels itself; showing a buffer on the canvas never blends them.
 		const target_options = {
@@ -108,9 +115,12 @@ export class Simulation {
 		this.#next.dispose();
 		this.#current.setSize(width, height);
 		this.#next.setSize(width, height);
-		this.renderer.setRenderTarget(this.#current);
-		this.renderer.setClearColor(new THREE.Color(ground, ground, ground));
-		this.renderer.clear();
+		// Both, so that the first step's change is from the ground. Alpha 0: nothing clipped.
+		this.renderer.setClearColor(new THREE.Color(ground, ground, ground), 0);
+		for (const target of [this.#current, this.#next]) {
+			this.renderer.setRenderTarget(target);
+			this.renderer.clear();
+		}
 
 		this.#sim_uniforms.res.value.set(width, height);
 		this.#sim_uniforms.seeds.value = this.#seed_texture;
@@ -131,8 +141,10 @@ export class Simulation {
 	}
 
 	/** Shows the latest frame on the canvas. */
-	draw(): void {
-		this.#screen_material.map = this.#current.texture;
+	draw(view: View): void {
+		this.#screen_uniforms.current.value = this.#current.texture;
+		this.#screen_uniforms.previous.value = this.#next.texture;
+		this.#screen_uniforms.view.value = VIEWS.indexOf(view);
 		this.renderer.setRenderTarget(null);
 		this.renderer.render(this.#screen_scene, this.#camera);
 	}

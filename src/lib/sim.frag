@@ -1,5 +1,6 @@
 // One simulation step. Needs WebGL2 (uint, floatBitsToUint); three.js's WebGL2 prefix
-// #defines gl_FragColor.
+// #defines gl_FragColor. Alpha records which channels the clamp changed, as bits R=1, G=2, B=4
+// over 255.
 uniform vec2 res;             // Buffer size in pixels
 uniform sampler2D prev_frame;
 uniform sampler2D seeds;      // The seed-dot canvas
@@ -51,6 +52,8 @@ void main() {
 	vec3 color = mix(sum.rgb, texelFetch(prev_frame, ivec2(gl_FragCoord.xy), 0).rgb, clamp(persistence, 0.0, 1.0));
 	// The clamp is what stops amplified frequencies growing forever (the 8-bit buffers would
 	// clamp anyway, and also round to 1/255). Then re-stamp the seed dots.
+	vec3 clamped = clamp(color, 0.0, 1.0);
+	float clipped = dot(vec3(notEqual(color, clamped)), vec3(1.0, 2.0, 4.0)) / 255.0;
 	vec4 seed = texture(seeds, uv);
-	gl_FragColor = vec4(mix(clamp(color, 0.0, 1.0), seed.rgb, seed.a), 1.0);
+	gl_FragColor = vec4(mix(clamped, seed.rgb, seed.a), clipped);
 }

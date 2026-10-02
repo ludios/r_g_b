@@ -4,7 +4,7 @@
 // from the defaults is written. Reading is forgiving: anything missing or unreadable is the
 // default, and numbers past a slider's end are that end.
 import { MAX_SEED } from "./kernel";
-import { DEFAULT_SETTINGS, PARAMS, type Param, SLIDERS, type Settings } from "./settings";
+import { DEFAULT_SETTINGS, PARAMS, type Param, SLIDERS, type Settings, VIEWS, type View } from "./settings";
 
 /** The query string's key for each setting; "k" is the seed. */
 const KEYS = {
@@ -16,6 +16,7 @@ const KEYS = {
 	persistence: "p",
 	speed:       "v",
 	ground:      "g",
+	view:        "vw",
 	mouse_x:     "mx",
 	mouse_y:     "my",
 } as const satisfies Record<keyof Settings, string>;
@@ -59,6 +60,10 @@ export function decode(query: string): Decoded {
 		const raw = q.get(KEYS[key]);
 		return raw === "none" ? null : PARAMS.find((p) => p === raw) ?? d[key];
 	};
+	const view = (): View => {
+		const raw = q.get(KEYS.view);
+		return VIEWS.find((v) => v === raw) ?? d.view;
+	};
 	const seed = Number(q.get("k") ?? NaN);
 	return {
 		settings: {
@@ -70,6 +75,7 @@ export function decode(query: string): Decoded {
 			persistence: number("persistence"),
 			speed:       number("speed"),
 			ground:      number("ground"),
+			view:        view(),
 			mouse_x:     param("mouse_x"),
 			mouse_y:     param("mouse_y"),
 		},

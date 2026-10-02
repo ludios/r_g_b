@@ -4,7 +4,7 @@
 	import { replaceState } from "$app/navigation";
 	import { decode, encode } from "$lib/codec";
 	import { KernelMorph, MAX_SEED, next_seed, with_contrast } from "$lib/kernel";
-	import { DEFAULT_SETTINGS, PARAMS, type Param, SLIDERS, type Settings, type Slider, position_of, value_at } from "$lib/settings";
+	import { DEFAULT_SETTINGS, PARAMS, type Param, SLIDERS, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { local_storage } from "$lib/storage";
 	import { THEMES, type Theme, ThemeChoice, parse_theme } from "$lib/theme.svelte";
@@ -87,7 +87,7 @@
 
 	function step_once(): void {
 		step();
-		sim!.draw();
+		sim!.draw(settings.view);
 	}
 
 	onMount(() => {
@@ -117,7 +117,7 @@
 			frame++;
 			seed    = morph.seed;
 			next_in = Math.ceil((1 - morph.progress) * settings.morph_steps);
-			sim!.draw();
+			sim!.draw(settings.view);
 		}
 		loop();
 		return () => cancelAnimationFrame(frame_request);
@@ -189,6 +189,7 @@
 	}
 
 	const PARAM_LABELS: Record<Param, string> = { contrast: "Contrast", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence" };
+	const VIEW_LABELS:  Record<View, string>  = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
 </script>
 
@@ -280,6 +281,15 @@
 						<input type="range" min="0" max={SLIDERS.ground.positions} value={position_of(SLIDERS.ground, settings.ground)} oninput={on_ground} />
 						<output>{settings.ground.toFixed(3)}</output>
 					</label>
+				</fieldset>
+
+				<fieldset>
+					<legend>View</legend>
+					<div class="choices">
+						{#each VIEWS as view (view)}
+							<label><input type="radio" name="view" bind:group={settings.view} value={view} /> {VIEW_LABELS[view]}</label>
+						{/each}
+					</div>
 				</fieldset>
 
 				<fieldset>

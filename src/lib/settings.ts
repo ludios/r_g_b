@@ -8,6 +8,13 @@ export type Param = "contrast" | "spacing" | "jitter" | "persistence";
 
 export const PARAMS: readonly Param[] = ["contrast", "spacing", "jitter", "persistence"];
 
+/**
+ * Ways to show a frame: in color; one channel alone, in gray; how much each channel changed in
+ * the last step; or which channels the clamp changed in the last step.
+ */
+export const VIEWS = ["color", "red", "green", "blue", "change", "clipped"] as const;
+export type View = (typeof VIEWS)[number];
+
 export interface Settings {
 	/** Scales each kernel weight's deviation from flat; 1 is the kernel as generated. */
 	contrast: number;
@@ -24,6 +31,8 @@ export interface Settings {
 	speed: number;
 	/** The gray that a restart fills the buffers with, 0 to 1. */
 	ground: number;
+	/** How the canvas shows each frame. */
+	view: View;
 	/** The setting that follows the pointer across the window, or none. */
 	mouse_x: Param | null;
 	mouse_y: Param | null;
@@ -38,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	persistence: 0,
 	speed:       1,
 	ground:      0.05,
+	view:        "color",
 	mouse_x:     null,
 	mouse_y:     null,
 };

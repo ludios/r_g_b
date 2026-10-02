@@ -3,7 +3,7 @@ import { assert, boolean, constantFrom, double, integer, property, record } from
 import { describe, expect, test } from "vitest";
 import { decode, encode } from "./codec";
 import { MAX_SEED } from "./kernel";
-import { DEFAULT_SETTINGS, PARAMS, SLIDERS } from "./settings";
+import { DEFAULT_SETTINGS, PARAMS, SLIDERS, VIEWS } from "./settings";
 
 const slider = (key: keyof typeof SLIDERS) => double({ min: SLIDERS[key].min, max: SLIDERS[key].max, noNaN: true });
 const settings = record({
@@ -15,6 +15,7 @@ const settings = record({
 	persistence: slider("persistence"),
 	speed:       slider("speed"),
 	ground:      slider("ground"),
+	view:        constantFrom(...VIEWS),
 	mouse_x:     constantFrom(null, ...PARAMS),
 	mouse_y:     constantFrom(null, ...PARAMS),
 });
