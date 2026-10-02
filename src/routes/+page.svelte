@@ -730,7 +730,7 @@
 			</form>
 
 			<details class="section" bind:open={open.how}>
-				<summary>How it works</summary>
+				<summary>How it works (slop)</summary>
 				<div class="prose">
 					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the squares are their weights, hollow if negative. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat.</p>
 					<p>“Tap” is a signal-processing term for one place a filter reads a sample and multiplies it by a weight. It comes from FIR filters built as a tapped delay line: a signal runs down a chain of delays, and each tap pulls off a copy and scales it. Here each tap is an offset from the pixel (x and y from −2 to 2, times Spacing) and a weight (its square in the diagram).</p>
