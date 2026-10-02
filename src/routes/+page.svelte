@@ -455,9 +455,12 @@
 		sync();
 	}
 
-	/** Space pauses, Enter steps, and Z and shift-Z undo and redo, except where they already mean something. */
+	/**
+	 * Space pauses, Enter steps, and Z and shift-Z undo and redo, except where they already mean
+	 * something, or a control has handled them.
+	 */
 	function on_key(event: KeyboardEvent): void {
-		if (event.target instanceof Element && event.target.closest("input, select, button, textarea, summary, a[href]")) {
+		if (event.defaultPrevented || (event.target instanceof Element && event.target.closest("input, select, button, textarea, summary, a[href]"))) {
 			return;
 		}
 		// Keys by what they type, so Z is Z on any layout, and either Enter steps.

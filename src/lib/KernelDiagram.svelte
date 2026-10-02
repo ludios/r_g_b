@@ -148,10 +148,13 @@
 		} else if (event.type === "pointerup") {
 			draft    = null;
 			selected = selected === press.index || press.index === MIDDLE ? null : press.index;
-			// On a touchscreen, focus would put up a keyboard over the screen.
+			// On a touchscreen, focus would put up a keyboard over the screen. With nothing selected,
+			// the arrow keys go on from here.
 			if (event.pointerType === "mouse" && selected !== null) {
 				hold();
 				void tick().then(edit_field);
+			} else if (event.pointerType === "mouse") {
+				diagram?.focus({ preventScroll: true });
 			}
 		}
 		press   = null;
@@ -179,20 +182,28 @@
 
 	/**
 	 * On the diagram, the arrow keys choose a tap, starting from the middle; Enter, or the start of a
-	 * number, goes to its field (the keystroke lands there); Escape unselects it.
+	 * number, goes to its field (the keystroke lands there); Escape unselects it, or with none
+	 * selected, leaves the diagram. Keys it takes are marked as handled. Shortcuts with Ctrl, Alt or
+	 * Command are the browser's.
 	 */
 	function on_diagram_key(event: KeyboardEvent): void {
+		if (event.ctrlKey || event.altKey || event.metaKey) {
+			return;
+		}
 		const arrow = ARROWS[event.key];
 		if (arrow !== undefined) {
 			event.preventDefault();
 			selected = step(selected ?? MIDDLE, ...arrow);
 		} else if (selected !== null && event.key === "Enter") {
 			event.preventDefault();
-			event.stopPropagation(); // Not a step
 			edit_field();
 		} else if (selected !== null && /^[\d.-]$/.test(event.key)) {
 			edit_field();
 		} else if (event.key === "Escape") {
+			event.preventDefault();
+			if (selected === null) {
+				diagram?.blur();
+			}
 			selected = null;
 		}
 	}
