@@ -545,7 +545,7 @@
 					<p>With <strong>Stamped every step</strong> on, the seeds are redrawn after each step. They stay put and keep feeding the pattern around them. With it off, they are drawn only at the start, then change like any other pixels.</p>
 					<p>Red, green and blue are processed separately. Against a dark-gray background, a red dot raises the red channel but lowers green and blue. That starts the channels in opposition: red against cyan.</p>
 					<h3>Editing the kernel</h3>
-					<p>The <strong>Hinton Diagram</strong> shows the weights. Hollow squares are negative, and bronze ones are greater than 1 or less than −1.</p>
+					<p>The <strong>Hinton Diagram</strong> shows each weight as a square, its area proportional to the weight’s size. Hollow squares are negative. Past 1 or −1, a square stops growing and turns bronze instead.</p>
 					<p>Drag a square or type a value to change a weight. The middle one adjusts itself to keep the total at 1.</p>
 					<p>The taps’ offsets from the pixel run from −2 to 2 on each axis, multiplied by <strong>Spacing</strong>, with the resulting positions rounded to whole pixels. Because the filter reads only at these positions, fine stripes can look like wider ones to it. This is why the Frequency Response map roughly repeats.</p>
 					<p><strong>Jitter</strong> gives each pixel a different spacing, fixed over time. This blurs the repeats and tends to favor the widest stripes.</p>
