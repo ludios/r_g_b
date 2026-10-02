@@ -29,7 +29,7 @@
 	const storage  = local_storage();
 	const SECTIONS_KEY = "r_g_b-open-sections";
 	/** The card's sections, and whether each starts open. */
-	const SECTIONS = { kernel: true, taps: true, time: true, start: true, view: true, pointer: true, how: false };
+	const SECTIONS = { time: true, start: true, taps: true, kernel: true, pointer: true, view: true, how: false };
 	type Section = keyof typeof SECTIONS;
 	/** Which of the card's sections are open, kept in localStorage. */
 	let open = $state(read_open());
@@ -517,6 +517,79 @@
 	{#if show_card}
 		<section class="card">
 			<form novalidate onsubmit={(e) => e.preventDefault()}>
+				<details class="section" bind:open={open.time}>
+					<summary>Time</summary>
+					<label class="row">
+						<span>Speed</span>
+						<input type="range" min="0" max={SLIDERS.speed.positions} value={position_of(SLIDERS.speed, settings.speed)} oninput={(e) => slide("speed", e)}
+							aria-valuetext={format_speed(settings.speed)} />
+						<output>{format_speed(settings.speed)}</output>
+					</label>
+					<p class="muted">Step {steps}.</p>
+				</details>
+
+				<details class="section" bind:open={open.start}>
+					<summary>Start</summary>
+					<div class="row">
+						<span>Seeds</span>
+						<div class="choices">
+							{#each SEEDS as seeds (seeds)}
+								<label><input type="radio" name="seeds" bind:group={settings.seeds} value={seeds} /> {SEED_LABELS[seeds]}</label>
+							{/each}
+							<label><input type="checkbox" bind:checked={settings.stamp} /> Stamped every step</label>
+						</div>
+					</div>
+					<label class="row">
+						<span>Ground</span>
+						<input type="range" min="0" max={SLIDERS.ground.positions} value={position_of(SLIDERS.ground, settings.ground)} oninput={(e) => slide("ground", e)} />
+						<output>{settings.ground.toFixed(3)}</output>
+					</label>
+					<label class="row">
+						<span>Noise</span>
+						<input type="range" min="0" max={SLIDERS.noise.positions} value={position_of(SLIDERS.noise, settings.noise)} oninput={(e) => slide("noise", e)}
+							aria-valuetext="plus or minus {settings.noise}" />
+						<output>±{settings.noise.toFixed(3)}</output>
+					</label>
+					<div class="row">
+						<span>Pixel size</span>
+						<div class="choices">
+							{#each PIXEL_SIZES as pixel (pixel)}
+								<label><input type="radio" name="pixel" bind:group={settings.pixel} value={pixel} /> {pixel}</label>
+							{/each}
+						</div>
+					</div>
+					<div class="row">
+						<span>Bit depth</span>
+						<div class="choices">
+							{#each BIT_DEPTHS as bit_depth (bit_depth)}
+								<label><input type="radio" name="bit_depth" bind:group={settings.bit_depth} value={bit_depth} /> {bit_depth}-bit</label>
+							{/each}
+						</div>
+					</div>
+				</details>
+
+				<details class="section" bind:open={open.taps}>
+					<summary>Taps</summary>
+					<label class="row">
+						<span>Spacing</span>
+						<input type="range" min="0" max={SLIDERS.spacing.positions} value={position_of(SLIDERS.spacing, settings.spacing)} oninput={(e) => slide("spacing", e)}
+							aria-valuetext="{settings.spacing} px" />
+						<output>{settings.spacing.toFixed(settings.spacing < 1 ? 2 : 1)} px</output>
+					</label>
+					<label class="row">
+						<span>Jitter</span>
+						<input type="range" min="0" max={SLIDERS.jitter.positions} value={position_of(SLIDERS.jitter, settings.jitter)} oninput={(e) => slide("jitter", e)}
+							aria-valuetext="{(settings.jitter * 100).toFixed(1)}%" />
+						<output>±{(settings.jitter * 100).toFixed(1)}%</output>
+					</label>
+					<label class="row">
+						<span>Persistence</span>
+						<input type="range" min="0" max={SLIDERS.persistence.positions} value={position_of(SLIDERS.persistence, settings.persistence)} oninput={(e) => slide("persistence", e)}
+							aria-valuetext="{(settings.persistence * 100).toFixed(1)}%" />
+						<output>{(settings.persistence * 100).toFixed(1)}%</output>
+					</label>
+				</details>
+
 				<details class="section" bind:open={open.kernel}>
 					<summary>Kernel</summary>
 					<div class="row">
@@ -593,90 +666,6 @@
 					</label>
 				</details>
 
-				<details class="section" bind:open={open.taps}>
-					<summary>Taps</summary>
-					<label class="row">
-						<span>Spacing</span>
-						<input type="range" min="0" max={SLIDERS.spacing.positions} value={position_of(SLIDERS.spacing, settings.spacing)} oninput={(e) => slide("spacing", e)}
-							aria-valuetext="{settings.spacing} px" />
-						<output>{settings.spacing.toFixed(settings.spacing < 1 ? 2 : 1)} px</output>
-					</label>
-					<label class="row">
-						<span>Jitter</span>
-						<input type="range" min="0" max={SLIDERS.jitter.positions} value={position_of(SLIDERS.jitter, settings.jitter)} oninput={(e) => slide("jitter", e)}
-							aria-valuetext="{(settings.jitter * 100).toFixed(1)}%" />
-						<output>±{(settings.jitter * 100).toFixed(1)}%</output>
-					</label>
-					<label class="row">
-						<span>Persistence</span>
-						<input type="range" min="0" max={SLIDERS.persistence.positions} value={position_of(SLIDERS.persistence, settings.persistence)} oninput={(e) => slide("persistence", e)}
-							aria-valuetext="{(settings.persistence * 100).toFixed(1)}%" />
-						<output>{(settings.persistence * 100).toFixed(1)}%</output>
-					</label>
-				</details>
-
-				<details class="section" bind:open={open.time}>
-					<summary>Time</summary>
-					<label class="row">
-						<span>Speed</span>
-						<input type="range" min="0" max={SLIDERS.speed.positions} value={position_of(SLIDERS.speed, settings.speed)} oninput={(e) => slide("speed", e)}
-							aria-valuetext={format_speed(settings.speed)} />
-						<output>{format_speed(settings.speed)}</output>
-					</label>
-					<p class="muted">Step {steps}.</p>
-				</details>
-
-				<details class="section" bind:open={open.start}>
-					<summary>Start</summary>
-					<div class="row">
-						<span>Seeds</span>
-						<div class="choices">
-							{#each SEEDS as seeds (seeds)}
-								<label><input type="radio" name="seeds" bind:group={settings.seeds} value={seeds} /> {SEED_LABELS[seeds]}</label>
-							{/each}
-							<label><input type="checkbox" bind:checked={settings.stamp} /> Stamped every step</label>
-						</div>
-					</div>
-					<label class="row">
-						<span>Ground</span>
-						<input type="range" min="0" max={SLIDERS.ground.positions} value={position_of(SLIDERS.ground, settings.ground)} oninput={(e) => slide("ground", e)} />
-						<output>{settings.ground.toFixed(3)}</output>
-					</label>
-					<label class="row">
-						<span>Noise</span>
-						<input type="range" min="0" max={SLIDERS.noise.positions} value={position_of(SLIDERS.noise, settings.noise)} oninput={(e) => slide("noise", e)}
-							aria-valuetext="plus or minus {settings.noise}" />
-						<output>±{settings.noise.toFixed(3)}</output>
-					</label>
-					<div class="row">
-						<span>Pixel size</span>
-						<div class="choices">
-							{#each PIXEL_SIZES as pixel (pixel)}
-								<label><input type="radio" name="pixel" bind:group={settings.pixel} value={pixel} /> {pixel}</label>
-							{/each}
-						</div>
-					</div>
-					<div class="row">
-						<span>Bit depth</span>
-						<div class="choices">
-							{#each BIT_DEPTHS as bit_depth (bit_depth)}
-								<label><input type="radio" name="bit_depth" bind:group={settings.bit_depth} value={bit_depth} /> {bit_depth}-bit</label>
-							{/each}
-						</div>
-					</div>
-				</details>
-
-				<details class="section" bind:open={open.view}>
-					<summary>View</summary>
-					{#each VIEW_LINES as line (line[0])}
-						<div class="choices">
-							{#each line as view (view)}
-								<label><input type="radio" name="view" bind:group={settings.view} value={view} /> {VIEW_LABELS[view]}</label>
-							{/each}
-						</div>
-					{/each}
-				</details>
-
 				<details class="section" bind:open={open.pointer}>
 					<summary>Pointer</summary>
 					<div class="row">
@@ -721,6 +710,17 @@
 							<label><input type="checkbox" bind:checked={fade} /> Fade when the pointer is away</label>
 						</div>
 					</div>
+				</details>
+
+				<details class="section" bind:open={open.view}>
+					<summary>View</summary>
+					{#each VIEW_LINES as line (line[0])}
+						<div class="choices">
+							{#each line as view (view)}
+								<label><input type="radio" name="view" bind:group={settings.view} value={view} /> {VIEW_LABELS[view]}</label>
+							{/each}
+						</div>
+					{/each}
 				</details>
 			</form>
 
