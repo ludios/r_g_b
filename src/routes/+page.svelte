@@ -544,7 +544,7 @@
 				<div class="prose">
 					<h3>How the image changes</h3>
 					<p>The image filters itself over and over. Each step uses the previous image to make the next.</p>
-					<p>For each pixel, the filter reads 25 samples, multiplies each by a weight, and adds the results. Each sample position is called a <strong>tap</strong>. The 25 taps and their weights make up the <strong>kernel</strong>.</p>
+					<p>For each pixel, the filter reads 25 samples in a 5×5 grid centered on that pixel, multiplies each by a weight, and adds the results. Each sample position is called a <strong>tap</strong>. The 25 taps and their weights make up the <strong>kernel</strong>.</p>
 					<p><strong>Persistence</strong> mixes the result with the pixel’s old value. A negative setting makes the change larger instead. Each color channel is then clipped to the range 0–1. If stamping is on, the seeds are painted back over the result.</p>
 					<h3>Starting a pattern</h3>
 					<p>The kernel’s weights add up to 1, so a flat color stays flat. To get a pattern started, use <strong>Noise</strong>, paint, or seeds. You can also click the <strong>Frequency Response</strong> map to restart with a stripe pattern.</p>
@@ -554,7 +554,7 @@
 					<h3>Editing the kernel</h3>
 					<p>The <strong>Hinton Diagram</strong> shows the 25 weights. Hollow squares are negative. Bronze means a weight is greater than 1 or less than −1, except in the middle square, whose outline is always bronze.</p>
 					<p>Drag a square or type a value to change a weight. The middle weight adjusts to keep the total at 1, preserving flat colors.</p>
-					<p>The taps form a 5×5 grid. Their offsets run from −2 to 2 on each axis, multiplied by <strong>Spacing</strong>, with the resulting positions rounded to whole pixels. Because the filter reads only at these positions, fine stripes can look like wider ones to it. This is why the Frequency Response map roughly repeats.</p>
+					<p>The taps’ offsets from the pixel run from −2 to 2 on each axis, multiplied by <strong>Spacing</strong>, with the resulting positions rounded to whole pixels. Because the filter reads only at these positions, fine stripes can look like wider ones to it. This is why the Frequency Response map roughly repeats.</p>
 					<p><strong>Jitter</strong> gives each pixel a slightly different spacing, fixed over time. This blurs the repeats and tends to favor the widest stripes.</p>
 					<p><strong>Contrast</strong> scales each weight’s difference from 1/25. That is the weight every tap would have in an equal average.</p>
 					<p><strong>Drift</strong> scales the kernel’s lopsided part. This can shift stripes and make them grow.</p>
