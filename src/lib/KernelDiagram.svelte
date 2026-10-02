@@ -2,9 +2,9 @@
 <script lang="ts">
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
 	// screen, whose area is the weight's size, filled if positive and hollow if negative; past 1
-	// either way, the square fills its cell in the accent color. Dragging
-	// a square up or down changes its weight, and clicking one, or choosing it with the arrow keys,
-	// gives a field to type it in; the taps that change with it are outlined. The middle tap is
+	// either way, the square fills its cell in the accent color. Dragging a square up or down
+	// changes its weight, and clicking one, or choosing it with the arrow keys, gives a field to
+	// type it in; the taps that change with it are outlined, it more heavily. The middle tap is
 	// whatever makes the sum 1, so it follows the others rather than being edited itself.
 	import { tick } from "svelte";
 	import { type Group, type Kernel, MIDDLE, TAPS, group_of, index_of, reweighted, tap_offset } from "./kernel";
@@ -47,8 +47,6 @@
 	let draft    = $state<{ text: string; typed: boolean } | null>(null);
 	let field    = $state<HTMLInputElement>();
 	let diagram  = $state<SVGSVGElement>();
-	/** Whether the diagram itself has the keyboard's focus, so the arrow keys choose taps. */
-	let focused  = $state(false);
 	/**
 	 * The tap pressed, by which pointer, and where; once it's moved far enough to be a drag, where
 	 * that started, the kernel then, and the kernel it last made.
@@ -65,9 +63,15 @@
 		return { x: (tap_offset(i).x + 2) * CELL, y: (2 - tap_offset(i).y) * CELL };
 	}
 
-	/** Whether a weight is too big for its square to show by area. */
+	/** A weight to three places, where one too small to show is 0, not -0. */
+	function format(weight: number): string {
+		const text = weight.toFixed(3);
+		return text === "-0.000" ? "0.000" : text;
+	}
+
+	/** Whether a weight, as it reads, is too big for its square to show by area. */
 	function over(weight: number): boolean {
-		return Math.abs(weight) > 1;
+		return Math.abs(Number(format(weight))) > 1;
 	}
 
 	/**
@@ -81,12 +85,6 @@
 	/** Where tap `i` reads from, in taps from the pixel itself; up is +y. */
 	function offset(i: number): string {
 		return `(${tap_offset(i).x}, ${tap_offset(i).y})`;
-	}
-
-	/** A weight to three places, where one too small to show is 0, not -0. */
-	function format(weight: number): string {
-		const text = weight.toFixed(3);
-		return text === "-0.000" ? "0.000" : text;
 	}
 
 	/**
@@ -154,7 +152,8 @@
 				hold();
 				void tick().then(edit_field);
 			} else if (event.pointerType === "mouse") {
-				diagram?.focus({ preventScroll: true });
+				// Without the keyboard's focus ring, which the cancelled pointerdown would otherwise get.
+				diagram?.focus({ preventScroll: true, focusVisible: false });
 			}
 		}
 		press   = null;
@@ -260,7 +259,7 @@
 	<svg bind:this={diagram} viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} tabindex="0" role="application"
 		aria-label="The kernel's 25 weights: the arrow keys choose a tap, and a number sets it"
 		onpointermove={move} onpointerup={release} onpointercancel={release} onpointerleave={() => (hover = null)}
-		onkeydown={on_diagram_key} onfocus={() => (focused = diagram!.matches(":focus-visible"))} onblur={() => (focused = false)}>
+		onkeydown={on_diagram_key}>
 		{#each { length: TAPS } as _, i (i)}
 			{@const { x, y } = cell(i)}
 			{@const w = kernel[i]!}
@@ -273,13 +272,13 @@
 		{/each}
 		{#each [MIDDLE, ...linked] as i (i)}
 			{@const { x, y } = cell(i)}
-			<rect class="outline" class:middle={i === MIDDLE} x={x} y={y} width={CELL} height={CELL} />
+			<rect class="outline" class:middle={i === MIDDLE} class:subject={i === subject} x={x} y={y} width={CELL} height={CELL} />
 		{/each}
 	</svg>
 	<figcaption>
-		<div class="line">
+		<div class="line" aria-live="polite">
 			{#if subject === null}
-				{focused ? "Arrows choose a tap." : "Drag or click to edit."}
+				<span class="pointer-hint">Drag or click to edit.</span><span class="keys-hint">Arrows choose a tap.</span>
 			{:else if subject === selected}
 				{offset(subject)}
 				<input bind:this={field} type="number" step="0.001" min={-MOST} max={MOST} value={draft?.text ?? format(kernel[subject]!)}
@@ -322,6 +321,9 @@
 	.outline.middle {
 		stroke: var(--accent);
 	}
+	.outline.subject {
+		stroke-width: 2;
+	}
 	.weight {
 		fill: var(--text);
 	}
@@ -352,6 +354,13 @@
 	}
 	.accent {
 		color: var(--accent);
+	}
+	/* While the keyboard has the diagram, the hint is for the arrow keys. */
+	.keys-hint, figure:has(svg:focus-visible) .pointer-hint {
+		display: none;
+	}
+	figure:has(svg:focus-visible) .keys-hint {
+		display: inline;
 	}
 	input {
 		flex: 1;
