@@ -555,18 +555,18 @@
 					<p>The <strong>Hinton Diagram</strong> shows the 25 weights. Hollow squares are negative. Bronze means a weight is greater than 1 or less than −1, except in the middle square, whose outline is always bronze.</p>
 					<p>Drag a square or type a value to change a weight. The middle weight adjusts to keep the total at 1, preserving flat colors.</p>
 					<p>The taps’ offsets from the pixel run from −2 to 2 on each axis, multiplied by <strong>Spacing</strong>, with the resulting positions rounded to whole pixels. Because the filter reads only at these positions, fine stripes can look like wider ones to it. This is why the Frequency Response map roughly repeats.</p>
-					<p><strong>Jitter</strong> gives each pixel a slightly different spacing, fixed over time. This blurs the repeats and tends to favor the widest stripes.</p>
+					<p><strong>Jitter</strong> gives each pixel a different spacing, fixed over time. This blurs the repeats and tends to favor the widest stripes.</p>
 					<p><strong>Contrast</strong> scales each weight’s difference from 1/25. That is the weight every tap would have in an equal average.</p>
 					<p><strong>Drift</strong> scales the kernel’s lopsided part. This can shift stripes and make them grow.</p>
-					<p>Mouse control of Contrast and Drift applies only to random kernels. Once you choose a preset or edit a weight, the mouse leaves those settings alone.</p>
+					<p>Mouse control of Contrast and Drift applies only to random kernels. Once you choose a preset or edit the kernel, Contrast and Drift return to 1× and the mouse leaves them alone.</p>
 					<h3>Reading the Frequency Response map</h3>
 					<p>The map estimates how much one step multiplies stripe contrast by, before clipping. Each position represents a stripe width and direction. The center is flat color; farther out, the stripes get finer.</p>
 					<p>Shaded areas have a multiplier above 1, so those stripes grow. Circles mark the fastest growth.</p>
 					<p>A step can also shift stripes. A shift of half a cycle swaps bright and dark. Hatched areas are close to that shift, so those patterns strobe.</p>
 					<p>Click anywhere on the map to restart the image with the corresponding stripes.</p>
 					<h3>Bit Depth</h3>
-					<p>Each step’s result is stored at the selected <strong>Bit Depth</strong>.</p>
-					<p>At <strong>8-bit</strong>, each color channel has 256 possible levels. A change smaller than half a level rounds away. As a blur spreads, its changes get smaller until they can no longer be stored. The blur stops, leaving a soft trace of the original image.</p>
+					<p>Each step’s result is stored at the selected <strong>Bit depth</strong>.</p>
+					<p>At <strong>8-bit</strong>, each color channel has 256 possible levels. A change smaller than half a level rounds away. As a blur spreads, its changes get smaller until they can no longer be stored. The blur stops, leaving a soft trace of what it blurred.</p>
 					<p><strong>16-bit</strong> and <strong>32-bit</strong> floats retain much smaller changes, so a blur gets flatter before it stops. At 32-bit, the remaining trace is too faint to see. Higher precision uses more memory and takes more time per step.</p>
 					<h3>Keyboard controls</h3>
 					<p>When no field, button, menu, link or section title has focus, <strong>Space</strong> pauses or plays, and <strong>Enter</strong> advances one step while paused. <strong>Z</strong> undoes a change to the kernel; <strong>Shift+Z</strong> redoes it.</p>
@@ -861,7 +861,7 @@
 	}
 	/* Like a figure's title, so it reads as part of the section rather than a section of its own. */
 	.prose h3 {
-		margin: 12px 0 2px;
+		margin: 12px 0 0;
 		font-size: 10px;
 		font-weight: normal;
 		letter-spacing: 0.1em;
@@ -870,6 +870,9 @@
 	}
 	.prose h3:first-child {
 		margin-top: 6px;
+	}
+	.prose h3 + p {
+		margin-top: 2px;
 	}
 
 	.credit {
