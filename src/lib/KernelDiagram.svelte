@@ -45,9 +45,9 @@
 	let field    = $state<HTMLInputElement>();
 	/**
 	 * The tap pressed, by which pointer, and where; once it's moved far enough to be a drag, where
-	 * that started and the kernel then.
+	 * that started, the kernel then, and the kernel it last made.
 	 */
-	let press: { pointer: number; index: number; y: number; from: Kernel | null } | null = null;
+	let press: { pointer: number; index: number; y: number; from: Kernel | null; last: Kernel | null } | null = null;
 
 	/** The tap the caption describes. */
 	const subject = $derived(dragged ?? selected ?? hover);
@@ -75,22 +75,33 @@
 	}
 
 	/**
-	 * Presses tap `index` with the primary button, unless another pointer already is, first taking
-	 * what's typed, as leaving the field would.
+	 * Presses tap `index` with the primary button of the primary pointer (not a second finger),
+	 * first taking what's typed, as leaving the field would. A press whose end never came is
+	 * forgotten.
 	 */
 	function down(event: PointerEvent, index: number): void {
-		if (event.button !== 0 || press !== null) {
+		if (event.button !== 0 || !event.isPrimary) {
 			return;
 		}
 		take_draft();
 		event.preventDefault();
 		(event.currentTarget as Element).closest("svg")!.setPointerCapture(event.pointerId);
-		press = { pointer: event.pointerId, index, y: event.clientY, from: null };
+		press = { pointer: event.pointerId, index, y: event.clientY, from: null, last: null };
 	}
 
-	/** Once a press has moved far enough up or down, drags the tap's weight, and its group's, with it. */
+	/**
+	 * Once a press has moved far enough up or down, drags the tap's weight, and its group's, with it.
+	 * A move without the button held ends a press whose pointerup never came.
+	 */
 	function move(event: PointerEvent): void {
-		if (press === null || event.pointerId !== press.pointer || press.index === MIDDLE) {
+		if (press === null || event.pointerId !== press.pointer) {
+			return;
+		}
+		if ((event.buttons & 1) === 0) {
+			release(event);
+			return;
+		}
+		if (press.index === MIDDLE) {
 			return;
 		}
 		if (press.from === null) {
@@ -104,19 +115,22 @@
 			onstart();
 		}
 		const delta = (press.y - event.clientY) * PER_PX;
-		onedit(reweighted(press.from, group_of(press.index, group), (k) => k + delta), true);
+		press.last  = reweighted(press.from, group_of(press.index, group), (k) => k + delta);
+		onedit(press.last, true);
 	}
 
 	/**
-	 * Ends the pointer's press, on pointerup, or if it's cancelled or the diagram loses it. One that
-	 * didn't drag and ended in pointerup was a click, which selects its tap or, if it already was or
-	 * it's the middle, unselects it.
+	 * Ends the pointer's press, on pointerup or otherwise. A drag hands on the kernel it ended with
+	 * as done; a press that didn't drag and ended in pointerup was a click, which selects its tap
+	 * or, if it already was or it's the middle, unselects it.
 	 */
 	function release(event: PointerEvent): void {
 		if (press === null || event.pointerId !== press.pointer) {
 			return;
 		}
-		if (event.type === "pointerup" && press.from === null) {
+		if (press.last !== null) {
+			onedit(press.last, false);
+		} else if (event.type === "pointerup") {
 			draft    = null;
 			selected = selected === press.index || press.index === MIDDLE ? null : press.index;
 			// On a touchscreen, focus would put up a keyboard over the screen.
@@ -177,7 +191,7 @@
 <figure>
 	<div class="figure-title">Hinton diagram</div>
 	<svg viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} role="img" aria-label="The kernel's 25 weights"
-		onpointermove={move} onpointerup={release} onpointercancel={release} onlostpointercapture={release} onpointerleave={() => (hover = null)}>
+		onpointermove={move} onpointerup={release} onpointercancel={release} onpointerleave={() => (hover = null)}>
 		{#each { length: TAPS } as _, i (i)}
 			{@const { x, y } = cell(i)}
 			{@const w = kernel[i]!}
