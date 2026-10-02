@@ -34,17 +34,20 @@ void main() {
 
 	// Static per-pixel +/-5% jitter on the tap spacing (uv is the same every frame). It speckles
 	// stripe edges, over a band that widens with the spacing.
-	vec2 tap = (1.0 / res) * tap_spacing * (random(uv) * 0.1 + 0.95);
-	// The buffers use RepeatWrapping, so the screen is a torus: patterns wrap across edges.
+	vec2 tap = tap_spacing * vec2(random(uv) * 0.1 + 0.95);
+	// Each tap reads the whole texel it lands in: pixel centers are at half-integers, so the
+	// floor rounds the offset to the nearest whole pixel. Wrapping makes the screen a torus:
+	// patterns wrap across edges.
 	vec4 sum = vec4(0.0);
 	for (int y = -2; y <= 2; y++) {
 		for (int x = -2; x <= 2; x++) {
-			sum += texture(prev_frame, uv + tap * vec2(x, y)) * kernel[(y + 2) * 5 + (x + 2)];
+			vec2 texel = mod(floor(gl_FragCoord.xy + tap * vec2(x, y)), res);
+			sum += texelFetch(prev_frame, ivec2(texel), 0) * kernel[(y + 2) * 5 + (x + 2)];
 		}
 	}
 
 	// Same as blending the kernel toward identity: slows growth; persistence = 1 freezes the image.
-	vec3 color = mix(sum.rgb, texture(prev_frame, uv).rgb, clamp(persistence, 0.0, 1.0));
+	vec3 color = mix(sum.rgb, texelFetch(prev_frame, ivec2(gl_FragCoord.xy), 0).rgb, clamp(persistence, 0.0, 1.0));
 	// The clamp is what stops amplified frequencies growing forever (the 8-bit buffers would
 	// clamp anyway, and also round to 1/255). Then re-stamp the seed dots.
 	vec4 seed = texture(seeds, uv);

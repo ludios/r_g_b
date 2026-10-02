@@ -41,7 +41,7 @@ function draw_seeds(ctx: CanvasRenderingContext2D, w: number, h: number): void {
 
 /**
  * Each step draws a full-screen quad into a buffer, convolving the previous one; then another
- * quad shows it on the canvas. The buffers wrap around, so the screen is a torus.
+ * quad shows it on the canvas. Taps wrap around the edges, so the screen is a torus.
  */
 export class Simulation {
 	readonly renderer: THREE.WebGLRenderer;
@@ -75,11 +75,10 @@ export class Simulation {
 		this.#sim_scene    = new THREE.Scene().add(new THREE.Mesh(quad, sim_material));
 		this.#screen_scene = new THREE.Scene().add(new THREE.Mesh(quad, this.#screen_material));
 
+		// The step reads whole texels itself; showing a buffer on the canvas never blends them.
 		const target_options = {
-			minFilter:     THREE.LinearFilter,
+			minFilter:     THREE.NearestFilter,
 			magFilter:     THREE.NearestFilter,
-			wrapS:         THREE.RepeatWrapping,
-			wrapT:         THREE.RepeatWrapping,
 			depthBuffer:   false,
 			stencilBuffer: false,
 		};
