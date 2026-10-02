@@ -542,15 +542,37 @@
 			<details class="section" bind:open={open.how}>
 				<summary>How it works (slop)</summary>
 				<div class="prose">
-					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the Hinton Diagram's squares are their weights, hollow if negative, and bronze past 1 either way, except the middle one. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat; to keep it so, when a square is dragged or typed in, the middle one takes up the difference.</p>
-					<p>“Tap” is a signal-processing term for one place a filter reads a sample and multiplies it by a weight. It comes from FIR filters built as a tapped delay line: a signal runs down a chain of delays, and each tap pulls off a copy and scales it. Here each tap is an offset from the pixel (x and y from −2 to 2, times Spacing) and a weight (its square in the diagram).</p>
-					<p>The Frequency Response map estimates what a step multiplies stripes' contrast by, for every stripe width and direction (flat in the middle, finer outward), before clipping: shaded where that's over 1, so they grow, and circled where fastest. A step can also shift stripes; half a cycle swaps bright and dark, and near that (hatched) they strobe.</p>
-					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them. The mouse moves either only while the kernel is random, so a kernel preset or an edited kernel stays as it was chosen or made.</p>
-					<p>Taps are Spacing apart, rounded to whole pixels, so fine stripes can look like wider ones to them, and the map roughly repeats. Jitter gives each pixel its own fixed spacing, blurring the repeats and tending to favor the widest stripes.</p>
-					<p>A flat ground stays flat, so something has to break it: Noise, a restart from stripes clicked on the Frequency Response map, paint, or the seeds. By default the seeds are a red, a green and a blue dot in a line through the middle, at 1/6, 1/2 and 5/6 of the window's longer side. With stamping on, each step paints them back over its result, so they stay put and keep feeding what grows around them; with it off, they're only where things start, and change like any other pixel.</p>
-					<p>Each step's result is stored at the Bit Depth. At 8 bits every channel is rounded to one of 256 levels, so a change of less than half a level is lost: a blur slows as it spreads, then stops, leaving a soft trace of what it blurred. 16-bit and 32-bit floats round far more finely, so a blur gets much flatter before it stops (at 32, too flat to see), for more memory and time per step.</p>
-					<p>Red, green and blue follow the rule separately. On dark gray, the red dot raises red and lowers green and blue, so they start opposite: red against cyan.</p>
-					<p>Unless a field, button, menu, link or section title has the focus, Space pauses and plays, Enter steps while paused, Z undoes a change to the kernel and Shift-Z redoes it. On the Hinton Diagram, the arrow keys choose a tap; type a weight and press Enter to set it.</p>
+					<h3>How the image changes</h3>
+					<p>The image filters itself over and over. Each step uses the previous image to make the next.</p>
+					<p>For each pixel, the filter reads 25 samples, multiplies each by a weight, and adds the results. Each sample position is called a <strong>tap</strong>. The 25 taps and their weights make up the <strong>kernel</strong>.</p>
+					<p><strong>Persistence</strong> mixes the result with the pixel’s old value. A negative setting makes the change larger instead. Each color channel is then clipped to the range 0–1. If stamping is on, the seeds are painted back over the result.</p>
+					<h3>Starting a pattern</h3>
+					<p>The kernel’s weights add up to 1, so a flat color stays flat. To get a pattern started, use <strong>Noise</strong>, paint, or seeds. You can also click the <strong>Frequency Response</strong> map to restart with a stripe pattern.</p>
+					<p>The default seeds are three dots: red, green and blue. They sit on a line through the center of the window, at 1/6, 1/2 and 5/6 of its longer dimension.</p>
+					<p>With <strong>Stamped every step</strong> on, the seeds are redrawn after each step. They stay put and keep feeding the pattern around them. With it off, they are drawn only at the start, then change like any other pixels.</p>
+					<p>Red, green and blue are processed separately. Against a dark-gray background, a red dot raises the red channel but lowers green and blue. That starts the channels in opposition: red against cyan.</p>
+					<h3>Editing the kernel</h3>
+					<p>The <strong>Hinton Diagram</strong> shows the 25 weights. Hollow squares are negative. Bronze means a weight is greater than 1 or less than −1, except in the middle square, whose outline is always bronze.</p>
+					<p>Drag a square or type a value to change a weight. The middle weight adjusts to keep the total at 1, preserving flat colors.</p>
+					<p>The taps form a 5×5 grid. Their offsets run from −2 to 2 on each axis, multiplied by <strong>Spacing</strong>, with the resulting positions rounded to whole pixels. Because the filter reads only at these positions, fine stripes can look like wider ones to it. This is why the Frequency Response map roughly repeats.</p>
+					<p><strong>Jitter</strong> gives each pixel a slightly different spacing, fixed over time. This blurs the repeats and tends to favor the widest stripes.</p>
+					<p><strong>Contrast</strong> scales each weight’s difference from 1/25. That is the weight every tap would have in an equal average.</p>
+					<p><strong>Drift</strong> scales the kernel’s lopsided part. This can shift stripes and make them grow.</p>
+					<p>Mouse control of Contrast and Drift applies only to random kernels. Once you choose a preset or edit a weight, the mouse leaves those settings alone.</p>
+					<h3>Reading the Frequency Response map</h3>
+					<p>The map estimates how much one step multiplies stripe contrast by, before clipping. Each position represents a stripe width and direction. The center is flat color; farther out, the stripes get finer.</p>
+					<p>Shaded areas have a multiplier above 1, so those stripes grow. Circles mark the fastest growth.</p>
+					<p>A step can also shift stripes. A shift of half a cycle swaps bright and dark. Hatched areas are close to that shift, so those patterns strobe.</p>
+					<p>Click anywhere on the map to restart the image with the corresponding stripes.</p>
+					<h3>Bit Depth</h3>
+					<p>Each step’s result is stored at the selected <strong>Bit Depth</strong>.</p>
+					<p>At <strong>8-bit</strong>, each color channel has 256 possible levels. A change smaller than half a level rounds away. As a blur spreads, its changes get smaller until they can no longer be stored. The blur stops, leaving a soft trace of the original image.</p>
+					<p><strong>16-bit</strong> and <strong>32-bit</strong> floats retain much smaller changes, so a blur gets flatter before it stops. At 32-bit, the remaining trace is too faint to see. Higher precision uses more memory and takes more time per step.</p>
+					<h3>Keyboard controls</h3>
+					<p>When no field, button, menu, link or section title has focus, <strong>Space</strong> pauses or plays, and <strong>Enter</strong> advances one step while paused. <strong>Z</strong> undoes a change to the kernel; <strong>Shift+Z</strong> redoes it.</p>
+					<p>In the Hinton Diagram, use the arrow keys to select a tap. Type a weight and press <strong>Enter</strong> to set it.</p>
+					<h3>Why “tap”?</h3>
+					<p>The name comes from FIR filters built as tapped delay lines. A signal passes through a chain of delays, and each tap takes a copy and multiplies it by a weight. Here, the taps read different positions in an image rather than different delays in a signal.</p>
 				</div>
 			</details>
 
@@ -836,6 +858,18 @@
 	}
 	.prose p {
 		margin: 6px 0;
+	}
+	/* Like a figure's title, so it reads as part of the section rather than a section of its own. */
+	.prose h3 {
+		margin: 12px 0 2px;
+		font-size: 10px;
+		font-weight: normal;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+	.prose h3:first-child {
+		margin-top: 6px;
 	}
 
 	.credit {
