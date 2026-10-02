@@ -510,7 +510,7 @@
 	const VIEW_LINES = [VIEWS.slice(0, VIEWS.indexOf("change")), VIEWS.slice(VIEWS.indexOf("change"))];
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
 	/** The settings presets' labels, in the order of their buttons. */
-	const SETTINGS_PRESET_LABELS: Record<SettingsPreset, string> = { still: "No mouse", paint: "Paint", noise: "From noise", gray: "Black and white" };
+	const SETTINGS_PRESET_LABELS: Record<SettingsPreset, string> = { still: "No mouse", paint: "Paint", noise: "From noise", gray: "B&W" };
 	const SETTINGS_PRESET_NAMES = Object.keys(SETTINGS_PRESET_LABELS) as SettingsPreset[];
 </script>
 
@@ -557,7 +557,7 @@
 			<details class="section" bind:open={open.presets}>
 				<summary>Presets</summary>
 				<div class="choices presets">
-					<button type="button" onclick={reset}>r_g_b.html</button>
+					<button type="button" onclick={reset}>r_g_b</button>
 					{#each SETTINGS_PRESET_NAMES as preset (preset)}
 						<button type="button" onclick={() => apply(preset)}>{SETTINGS_PRESET_LABELS[preset]}</button>
 					{/each}
