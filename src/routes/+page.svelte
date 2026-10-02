@@ -641,12 +641,16 @@
 							aria-valuetext="{(settings.jitter * 100).toFixed(1)}%" />
 						<output>±{(settings.jitter * 100).toFixed(1)}%</output>
 					</label>
-					<label class="row">
+					<!-- Not a label: the 0 button would be a second control in it. -->
+					<div class="row">
 						<span>Persistence</span>
-						<input type="range" min="0" max={SLIDERS.persistence.positions} value={position_of(SLIDERS.persistence, settings.persistence)} oninput={(e) => slide("persistence", e)}
-							aria-valuetext="{(settings.persistence * 100).toFixed(1)}%" />
+						<div class="zeroable">
+							<input type="range" min="0" max={SLIDERS.persistence.positions} value={position_of(SLIDERS.persistence, settings.persistence)} oninput={(e) => slide("persistence", e)}
+								aria-label="Persistence" aria-valuetext="{(settings.persistence * 100).toFixed(1)}%" />
+							<button type="button" onclick={() => (settings.persistence = 0)} disabled={settings.persistence === 0} aria-label="Persistence to 0">0</button>
+						</div>
 						<output>{(settings.persistence * 100).toFixed(1)}%</output>
-					</label>
+					</div>
 				</details>
 
 				<details class="section" bind:open={open.kernel}>
@@ -1009,6 +1013,22 @@
 		padding: 0 7px;
 		font-size: 12px;
 		line-height: 20px;
+	}
+	/* A two-sided slider with a button that puts it back to its middle, which a drag can't easily
+	   land on. */
+	.zeroable {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.zeroable input {
+		flex: 1;
+		min-width: 0;
+	}
+	.zeroable button {
+		padding: 0 7px;
+		font-size: 12px;
+		line-height: 18px;
 	}
 
 	.seed {
