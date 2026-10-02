@@ -1,7 +1,8 @@
 <!-- Model-output: Claude Opus 5.5 -->
 <script lang="ts">
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
-	// screen, whose area is the weight's size, filled if positive and hollow if negative. Dragging
+	// screen, whose area is the weight's size, filled if positive and hollow if negative; past 1
+	// either way, the square fills its cell in the accent color. Dragging
 	// a square up or down changes its weight, and clicking one gives a field to type it in; the
 	// taps that change with it are outlined. The middle tap is whatever makes the sum 1, so it
 	// follows the others rather than being edited itself.
@@ -59,9 +60,17 @@
 		return { x: (tap_offset(i).x + 2) * CELL, y: (2 - tap_offset(i).y) * CELL };
 	}
 
-	/** A weight of 1 or more fills its cell, less fills less, by area. */
+	/** Whether a weight is too big for its square to show by area. */
+	function over(weight: number): boolean {
+		return Math.abs(weight) > 1;
+	}
+
+	/**
+	 * A square's side: by area, up to most of the cell at 1; past that, all of the cell but a pixel
+	 * each side, which keeps a hollow square's stroke inside it.
+	 */
 	function side(weight: number): number {
-		return CELL * 0.9 * Math.sqrt(Math.min(1, Math.abs(weight)));
+		return over(weight) ? CELL - 2 : CELL * 0.9 * Math.sqrt(Math.abs(weight));
 	}
 
 	/** Where tap `i` reads from, in taps from the pixel itself; up is +y. */
@@ -200,7 +209,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<g class="tap" class:middle={i === MIDDLE} class:linked={linked.includes(i)} onpointerdown={(e) => down(e, i)} onpointerenter={() => (hover = i)}>
 				<rect class="cell" x={x} y={y} width={CELL} height={CELL} />
-				<rect class="weight" class:negative={w < 0} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
+				<rect class="weight" class:negative={w < 0} class:over={over(w)} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
 			</g>
 		{/each}
 	</svg>
@@ -254,6 +263,13 @@
 		fill: none;
 		stroke: var(--text);
 		stroke-width: 1.5;
+	}
+	.weight.over {
+		fill: var(--accent);
+	}
+	.weight.over.negative {
+		fill: none;
+		stroke: var(--accent);
 	}
 	figcaption {
 		font-size: 11px;
