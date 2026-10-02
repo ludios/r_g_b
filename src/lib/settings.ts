@@ -112,16 +112,16 @@ export const DEFAULT_SETTINGS: Settings = {
 	paint:       "#ffffff",
 };
 
-/** Changes to make to the settings, leaving the rest as they are, by name. */
+/** Changes to make to the settings, leaving the rest as they are, by name, in the order the card lists them. */
 export const SETTINGS_PRESETS = {
 	/** The mouse lets go, so what it set stays put. */
 	still: { mouse_x: null, mouse_y: null },
+	/** Restarts from a blank ground, and clicks and drags paint on it; the mouse lets go. */
+	paint: { seeds: "none", noise: 0, click: "paint", mouse_x: null, mouse_y: null },
 	/** Restarts from noise everywhere, so the kernel's stripes grow all over at once. */
 	noise: { seeds: "none", noise: 0.05 },
 	/** Restarts from one white dot, which grows the same in every channel: black and white. */
 	gray:  { seeds: "white", noise: 0 },
-	/** Restarts from a blank ground, and clicks and drags paint on it; the mouse lets go. */
-	paint: { seeds: "none", noise: 0, click: "paint", mouse_x: null, mouse_y: null },
 } as const satisfies Record<string, Partial<Settings>>;
 
 export type SettingsPreset = keyof typeof SETTINGS_PRESETS;

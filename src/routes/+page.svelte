@@ -510,7 +510,7 @@
 	/** The View section's lines: the picture and its channels, then what the last step did, from Change on. */
 	const VIEW_LINES = [VIEWS.slice(0, VIEWS.indexOf("change")), VIEWS.slice(VIEWS.indexOf("change"))];
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
-	const SETTINGS_PRESET_LABELS: Record<SettingsPreset, string> = { still: "No mouse", noise: "From noise", gray: "Black and white", paint: "Paint" };
+	const SETTINGS_PRESET_LABELS: Record<SettingsPreset, string> = { still: "No mouse", paint: "Paint", noise: "From noise", gray: "Black and white" };
 </script>
 
 <svelte:head>
