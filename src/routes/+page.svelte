@@ -509,7 +509,7 @@
 </script>
 
 <svelte:head>
-	<title>r_g_b.html by v21</title>
+	<title>r_g_b</title>
 </svelte:head>
 
 <svelte:window onpointermove={on_pointer_move} onmouseout={on_mouse_out} onkeydown={on_key} onresize={() => restart()} />
