@@ -12,6 +12,7 @@ uniform float persistence;    // How much of the previous frame to keep
 uniform bool starting;        // Whether to start afresh rather than step: the ground, noise and seeds
 uniform float ground;         // The gray to start from
 uniform float noise;          // How far each channel of each pixel starts from the ground, at most
+uniform vec3 wave;            // Stripes to start with: cycles per pixel across and up, and amplitude
 
 // noise from http://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
 uint hash(uint x) {
@@ -57,9 +58,10 @@ vec3 step_from_previous(vec2 uv) {
 
 void main() {
 	vec2 uv = gl_FragCoord.xy / res;
-	// The noise is the same at every restart of the same size.
+	// The noise is the same at every restart of the same size. Pixel n's center is at n + 0.5.
 	vec3 color = starting
 		? ground + noise * (2.0 * vec3(random(uv, 1u), random(uv, 2u), random(uv, 3u)) - 1.0)
+			+ wave.z * cos(6.283185307 * dot(wave.xy, floor(gl_FragCoord.xy)))
 		: step_from_previous(uv);
 
 	// The clamp is what stops amplified frequencies growing forever (the 8-bit buffers would

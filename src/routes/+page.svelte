@@ -2,6 +2,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { replaceState } from "$app/navigation";
+	import GrowthMap from "$lib/GrowthMap.svelte";
 	import KernelDiagram from "$lib/KernelDiagram.svelte";
 	import { type KernelName, decode, encode } from "$lib/codec";
 	import { type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, next_seed, with_contrast, with_drift, with_weight } from "$lib/kernel";
@@ -32,6 +33,8 @@
 	let last_seed = 0;
 	/** The kernel the step uses: the base, with the drift and contrast applied. */
 	const shown   = $derived(shape(base));
+	const model   = $derived({ kernel: shown, spacing: settings.spacing, jitter: settings.jitter, persistence: settings.persistence });
+	let map_caption = $state("");
 	const encoded = $derived(encode(settings, name_of(source, base)));
 	const PRESET_NAMES = Object.keys(PRESETS) as Preset[];
 
@@ -60,17 +63,21 @@
 	let width  = $state(0);
 	let height = $state(0);
 
-	function restart(): void {
+	/**
+	 * Starts again from the ground, noise and seeds.
+	 * @param wave Faint stripes to add, in cycles per pixel across and up.
+	 */
+	function restart(wave?: { fx: number; fy: number }): void {
 		const w = Math.ceil(window.innerWidth / settings.pixel);
 		const h = Math.ceil(window.innerHeight / settings.pixel);
-		sim?.restart({ width: w, height: h, ground: settings.ground, noise: settings.noise, seeds: settings.seeds, float: settings.float });
+		sim?.restart({ width: w, height: h, ground: settings.ground, noise: settings.noise, seeds: settings.seeds, float: settings.float, wave });
 		// Written, not read, so the effect below doesn't depend on them.
 		width  = w;
 		height = h;
 	}
 
 	// The settings of what a restart starts from restart it when they change.
-	$effect(restart);
+	$effect(() => restart());
 
 	/** The kernel with the drift and contrast settings applied. */
 	function shape(kernel: Kernel): Kernel {
@@ -169,7 +176,7 @@
 		sim = new Simulation(canvas);
 		restart();
 		// A lost WebGL context loses the buffers, so it restarts.
-		canvas.addEventListener("webglcontextrestored", restart);
+		canvas.addEventListener("webglcontextrestored", () => restart());
 
 		let frame = 0;
 		let frame_request = 0;
@@ -262,7 +269,7 @@
 	<title>r_g_b.html by v21</title>
 </svelte:head>
 
-<svelte:window onpointermove={on_pointer_move} onmouseout={on_mouse_out} onkeydown={on_key} onresize={restart} />
+<svelte:window onpointermove={on_pointer_move} onmouseout={on_mouse_out} onkeydown={on_key} onresize={() => restart()} />
 
 <canvas bind:this={canvas} onclick={new_kernel} style:width="{width * settings.pixel}px" style:height="{height * settings.pixel}px"></canvas>
 
@@ -274,7 +281,7 @@
 			<header class="actions">
 				<button type="button" onclick={toggle_pause}>{paused ? "Play" : "Pause"}</button>
 				<button type="button" onclick={step_once} disabled={!paused}>Step</button>
-				<button type="button" onclick={restart}>Restart</button>
+				<button type="button" onclick={() => restart()}>Restart</button>
 				<button type="button" onclick={new_kernel}>New kernel</button>
 			</header>
 
@@ -315,7 +322,9 @@
 					{/if}
 					<div class="figures">
 						<KernelDiagram kernel={shown} onedit={edit_weight} />
+						<GrowthMap model={model} theme={theme.theme} onplant={(fx, fy) => restart({ fx, fy })} bind:caption={map_caption} />
 					</div>
+					<p class="muted">{map_caption}</p>
 					<label class="row">
 						<span>Contrast</span>
 						<input type="range" min="0" max={SLIDERS.contrast.positions} value={position_of(SLIDERS.contrast, settings.contrast)} oninput={(e) => slide("contrast", e)} />
@@ -572,8 +581,9 @@
 	.figures {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 12px 20px;
-		margin: 6px 0;
+		align-items: flex-start;
+		gap: 12px 24px;
+		margin: 6px 0 0;
 	}
 
 	.seed {

@@ -7,6 +7,9 @@ import { type Seeds, VIEWS, type View } from "./settings";
 import screen_shader from "./screen.frag?raw";
 import sim_shader from "./sim.frag?raw";
 
+/** How far a planted wave's stripes swing from the ground. */
+const WAVE = 0.05;
+
 /** What a restart starts from. */
 export interface StartSettings {
 	/** The buffers' size in pixels. */
@@ -19,6 +22,8 @@ export interface StartSettings {
 	seeds: Seeds;
 	/** Whether the buffers hold half floats rather than bytes, which round to 1/255. */
 	float: boolean;
+	/** Faint stripes to start with, in cycles per pixel across and up, if any. */
+	wave?: { fx: number; fy: number };
 }
 
 /** What one step of the simulation does, besides convolving with the kernel. */
@@ -84,6 +89,7 @@ export class Simulation {
 		starting:    { value: false },
 		ground:      { value: 0 },
 		noise:       { value: 0 },
+		wave:        { value: new THREE.Vector3() },
 	};
 	#screen_uniforms = {
 		current:  { value: null as THREE.Texture | null },
@@ -154,6 +160,10 @@ export class Simulation {
 		u.seeds.value  = this.#seed_texture;
 		u.ground.value = start.ground;
 		u.noise.value  = start.noise;
+		// Whole cycles across the buffers, so the stripes meet themselves where the screen wraps.
+		const fx = Math.round((start.wave?.fx ?? 0) * width) / width;
+		const fy = Math.round((start.wave?.fy ?? 0) * height) / height;
+		u.wave.value.set(fx, fy, start.wave === undefined ? 0 : WAVE);
 		// Both buffers, so that the first step's change is from the start.
 		u.starting.value = true;
 		for (const target of [this.#current, this.#next]) {
