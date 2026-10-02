@@ -57,8 +57,13 @@ export const PRESETS = {
 	row:      kernel_of((x, y) => (y === 0 ? [-0.25, 0.5, 0.5, 0.5, -0.25][x + 2]! : 0)),
 	/** Blurs across, sharpens up and down: bands 2 taps tall double every step. */
 	saddle:   kernel_of((x, y) => (x === 0 && y === 0 ? 1 : y === 0 && Math.abs(x) === 1 ? 0.25 : x === 0 && Math.abs(y) === 1 ? -0.25 : 0)),
-	/** Positive middle, negative edge: stripes about 4.5 taps apart grow, at any angle. */
+	/**
+	 * Positive middle, negative edge: stripes about 4.5 taps apart grow, upright and level ones
+	 * fastest (2.4 times a step, against 2 at 45 degrees), so a dot grows into squares.
+	 */
 	ring:     kernel_of((x, y) => ({ 0: 0.76, 1: 0.35, 2: 0.12, 4: -0.075, 5: -0.11, 8: -0.115 })[x * x + y * y] ?? 0),
+	/** The ring retuned: stripes about 4.2 taps apart grow alike at any angle, so a dot grows into circles. */
+	circles:  kernel_of((x, y) => ({ 0: 0.96, 1: 0.37, 2: -0.08, 4: -0.13, 5: -0.07, 8: -0.01 })[x * x + y * y] ?? 0),
 	/** The row and its quarter turn, halved: two diagonal stripes cross, and the clamp makes dots. */
 	dots:     kernel_of((x, y) => (x !== 0 && y !== 0 ? 0 : x === 0 && y === 0 ? 0.5 : Math.abs(x + y) === 1 ? 0.25 : -0.125)),
 	/** Strong middle, negative neighbors: the finest checkerboard doubles every step. */

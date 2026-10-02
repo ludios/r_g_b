@@ -1,7 +1,7 @@
 // Model-output: Claude Opus 5.5
 import { assert, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
-import { PRESETS, TAPS, gen_kernel, seeded_kernel } from "./kernel";
+import { type Kernel, PRESETS, TAPS, gen_kernel, seeded_kernel } from "./kernel";
 import { SLIDERS } from "./settings";
 import { type StepModel, fastest, growing, growth_map, mode_at, motion, multiplier } from "./spectrum";
 
@@ -26,6 +26,20 @@ function step(model: StepModel, image: number[][]): number[][] {
 		}
 		return model.persistence * value + (1 - model.persistence) * sum;
 	}));
+}
+
+/**
+ * The most a step of `kernel`, with taps 1 pixel apart and no jitter, grows stripes of any width
+ * whose waves run `degrees` counterclockwise from across.
+ */
+function fastest_along(kernel: Kernel, degrees: number): number {
+	const angle = (degrees * Math.PI) / 180;
+	let most = 0;
+	for (let i = 1; i <= 500; i++) {
+		const f = i / 1000;
+		most = Math.max(most, multiplier({ kernel, spacing: 1, jitter: 0, persistence: 0 }, f * Math.cos(angle), f * Math.sin(angle)).growth);
+	}
+	return most;
 }
 
 describe("multiplier", () => {
@@ -135,5 +149,16 @@ describe("motion", () => {
 	test("persistence turns the checkerboard's inverting growth into decay", () => {
 		const map = growth_map({ kernel: PRESETS.checker, spacing: 10, jitter: 0, persistence: 0.5 }, 31);
 		expect(fastest(map)).toBeNull();
+	});
+});
+
+describe("presets", () => {
+	test("the ring grows upright and level stripes fastest; the circles grow them alike at any angle", () => {
+		expect(fastest_along(PRESETS.ring, 0)).toBeGreaterThan(1.2 * fastest_along(PRESETS.ring, 45));
+		const level = fastest_along(PRESETS.circles, 0);
+		expect(level).toBeGreaterThan(2);
+		for (let degrees = 5; degrees <= 45; degrees += 5) {
+			expect(Math.abs(fastest_along(PRESETS.circles, degrees) / level - 1)).toBeLessThan(0.01);
+		}
 	});
 });
