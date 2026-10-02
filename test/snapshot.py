@@ -19,7 +19,8 @@ Example: test/snapshot.py HEAD /tmp/a && test/snapshot.py . /tmp/b && test/snaps
 """
 import argparse, base64, concurrent.futures, functools, http.server, json, os, shutil, signal, struct, subprocess, sys, tempfile, threading, zlib
 
-QUERIES = ["k=1", "k=2&c=3.5&s=4", "k=3&s=40&p=0.5&ms=60", "k=4&c=1.2&s=2&j=0"]
+QUERIES = ["k=1", "k=2&c=3.5&s=4", "k=3&s=40&p=0.5&ms=60", "k=4&c=1.2&s=2&j=0",
+           "k=ring&c=1.5&d=0.5&sd=white&g=0.5&n=0.02&px=2&f=1&vw=clipped"]
 
 PRE = """<script>
 (() => {
