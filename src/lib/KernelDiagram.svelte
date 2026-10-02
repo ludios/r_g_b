@@ -26,8 +26,8 @@
 	const CELL = 26;
 	/** How much a weight changes per pixel of drag. */
 	const PER_PX = 0.005;
-	/** How many pixels a press moves up or down before it's a drag rather than a click. */
-	const SLOP = 3;
+	/** How many pixels a press moves up or down before it's a drag rather than a click: a finger wobbles more than a mouse. */
+	const SLOP = { mouse: 3, other: 10 };
 	/** The most a typed weight can be either way; past 1 or so, it only floods the screen. */
 	const MOST = 10;
 
@@ -44,10 +44,10 @@
 	let draft    = $state<{ text: string; typed: boolean } | null>(null);
 	let field    = $state<HTMLInputElement>();
 	/**
-	 * The tap pressed while the pointer's down, and where; once it's moved far enough to be a drag,
-	 * where that started and the kernel then.
+	 * The tap pressed, by which pointer, and where; once it's moved far enough to be a drag, where
+	 * that started and the kernel then.
 	 */
-	let press: { index: number; y: number; from: Kernel | null } | null = null;
+	let press: { pointer: number; index: number; y: number; from: Kernel | null } | null = null;
 
 	/** The tap the caption describes. */
 	const subject = $derived(dragged ?? selected ?? hover);
@@ -69,21 +69,27 @@
 		return `(${tap_offset(i).x}, ${tap_offset(i).y})`;
 	}
 
-	/** Presses tap `index`, first taking what's typed, as leaving the field would. */
+	/**
+	 * Presses tap `index` with the primary button, unless another pointer already is, first taking
+	 * what's typed, as leaving the field would.
+	 */
 	function down(event: PointerEvent, index: number): void {
+		if (event.button !== 0 || press !== null) {
+			return;
+		}
 		take_draft();
 		event.preventDefault();
 		(event.currentTarget as Element).closest("svg")!.setPointerCapture(event.pointerId);
-		press = { index, y: event.clientY, from: null };
+		press = { pointer: event.pointerId, index, y: event.clientY, from: null };
 	}
 
 	/** Once a press has moved far enough up or down, drags the tap's weight, and its group's, with it. */
 	function move(event: PointerEvent): void {
-		if (press === null || press.index === MIDDLE) {
+		if (press === null || event.pointerId !== press.pointer || press.index === MIDDLE) {
 			return;
 		}
 		if (press.from === null) {
-			if (Math.abs(event.clientY - press.y) < SLOP) {
+			if (Math.abs(event.clientY - press.y) < (event.pointerType === "mouse" ? SLOP.mouse : SLOP.other)) {
 				return;
 			}
 			press.y    = event.clientY;
@@ -97,11 +103,14 @@
 	}
 
 	/**
-	 * Ends a press; one that didn't drag was a click, which selects its tap or, if it already was or
-	 * it's the middle, unselects it.
+	 * Ends the pointer's press. One that didn't drag and wasn't cancelled was a click, which selects
+	 * its tap or, if it already was or it's the middle, unselects it.
 	 */
-	function up(event: PointerEvent): void {
-		if (press !== null && press.from === null) {
+	function release(event: PointerEvent): void {
+		if (press === null || event.pointerId !== press.pointer) {
+			return;
+		}
+		if (event.type === "pointerup" && press.from === null) {
 			draft    = null;
 			selected = selected === press.index || press.index === MIDDLE ? null : press.index;
 			// On a touchscreen, focus would put up a keyboard over the screen.
@@ -110,11 +119,6 @@
 				void tick().then(() => field?.select());
 			}
 		}
-		press   = null;
-		dragged = null;
-	}
-
-	function cancel(): void {
 		press   = null;
 		dragged = null;
 	}
@@ -167,7 +171,7 @@
 <figure>
 	<div class="figure-title">Hinton diagram</div>
 	<svg viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} role="img" aria-label="The kernel's 25 weights"
-		onpointermove={move} onpointerup={up} onpointercancel={cancel} onpointerleave={() => (hover = null)}>
+		onpointermove={move} onpointerup={release} onpointercancel={release} onpointerleave={() => (hover = null)}>
 		{#each { length: TAPS } as _, i (i)}
 			{@const { x, y } = cell(i)}
 			{@const w = kernel[i]!}
