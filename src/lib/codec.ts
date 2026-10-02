@@ -3,7 +3,7 @@
 // The settings and the kernel as a query string, for the address bar. Only what differs from the
 // defaults is written. Reading is forgiving: anything missing or unreadable is the default, and
 // numbers past a slider's end are that end.
-import { type Kernel, MAX_SEED, PRESETS, type Preset, TAPS } from "./kernel";
+import { type Kernel, MAX_SEED, PRESETS, type Preset, TAPS, balanced } from "./kernel";
 import { CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, type MouseTarget, BIT_DEPTHS, PIXEL_SIZES, SEEDS, SLIDERS, type Settings, VIEWS } from "./settings";
 
 /** The query string's key for each setting; "k" is a random kernel's seed or a preset, "w" weights. */
@@ -134,9 +134,9 @@ function decode_progress(q: URLSearchParams): number {
 function decode_kernel(q: URLSearchParams): KernelName | null {
 	const weights = (q.get("w") ?? "").split(",").map(Number);
 	if (weights.length === TAPS && weights.every(Number.isFinite)) {
-		// Any sum but 1 brightens or darkens flat areas, step after step.
-		const adjustment = (1 - weights.reduce((s, k) => s + k, 0)) / TAPS;
-		const kernel = weights.map((k) => k + adjustment);
+		// Any sum but 1 brightens or darkens flat areas, step after step. The middle tap makes it
+		// up, as it does for edits, so the weights typed in come back as they were.
+		const kernel = balanced(weights);
 		// Huge weights can sum past the largest number, or pass float32's in the shader.
 		if (kernel.every((k) => Math.abs(k) <= MOST_WEIGHT)) {
 			return kernel;

@@ -227,15 +227,18 @@ export function group_of(index: number, group: Group): number[] {
 	return Array.from({ length: TAPS }, (_, i) => i).filter((i) => tap_offset(i).x ** 2 + tap_offset(i).y ** 2 === x * x + y * y);
 }
 
+/** The kernel with the middle tap set to what's left of 1 after the others. */
+export function balanced(kernel: Kernel): Kernel {
+	return kernel.with(MIDDLE, 1 - kernel.reduce((sum, k, i) => (i === MIDDLE ? sum : sum + k), 0));
+}
+
 /**
  * The kernel with each of `taps` given the weight `reweight` makes of its old one, and the middle
  * tap, which can't be among them, set to what's left of 1.
  */
 export function reweighted(kernel: Kernel, taps: number[], reweight: (weight: number) => number): Kernel {
 	A.eq(taps.indexOf(MIDDLE), -1);
-	const out = kernel.map((k, i) => (taps.includes(i) ? reweight(k) : k));
-	out[MIDDLE] = 1 - out.reduce((sum, k, i) => (i === MIDDLE ? sum : sum + k), 0);
-	return out;
+	return balanced(kernel.map((k, i) => (taps.includes(i) ? reweight(k) : k)));
 }
 
 /**

@@ -1,7 +1,8 @@
 // Model-output: Claude Opus 5.5
+import { AssertionError } from "ayy";
 import { array, assert, constantFrom, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
-import { FLAT, GROUPS, Kernels, MAX_SEED, MIDDLE, PRESETS, TAPS, TRANSFORMS, gen_kernel, group_of, mutated, next_seed, reweighted, seeded_kernel, with_contrast, with_drift } from "./kernel";
+import { FLAT, GROUPS, Kernels, MAX_SEED, MIDDLE, PRESETS, TAPS, TRANSFORMS, balanced, gen_kernel, group_of, mutated, next_seed, reweighted, seeded_kernel, with_contrast, with_drift } from "./kernel";
 
 /** Uniform draws in [0, 1), as many as a kernel takes: two per tap and one for the smoothing. */
 const draws = array(double({ min: 0, max: 1, maxExcluded: true, noNaN: true }), { minLength: 2 * TAPS + 1, maxLength: 2 * TAPS + 1 });
@@ -102,7 +103,16 @@ describe("group_of", () => {
 	});
 
 	test("refuses the middle tap, which follows the others", () => {
-		expect(() => group_of(MIDDLE, "tap")).toThrow("12 === 12");
+		expect(() => group_of(MIDDLE, "tap")).toThrow(AssertionError);
+	});
+});
+
+describe("balanced", () => {
+	test("puts a kernel's sum back at 1 with the middle tap alone", () => {
+		const drifted = PRESETS.ring.with(0, 0.9);
+		const fixed   = balanced(drifted);
+		expect(sum(fixed)).toBeCloseTo(1, 12);
+		expect(fixed.toSpliced(MIDDLE, 1)).toEqual(drifted.toSpliced(MIDDLE, 1));
 	});
 });
 
@@ -135,7 +145,7 @@ describe("reweighted", () => {
 	});
 
 	test("refuses to set the middle tap", () => {
-		expect(() => reweighted(PRESETS.box, [MIDDLE], () => 0)).toThrow("0 !== -1");
+		expect(() => reweighted(PRESETS.box, [MIDDLE], () => 0)).toThrow(AssertionError);
 	});
 });
 

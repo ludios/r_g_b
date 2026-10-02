@@ -3,7 +3,7 @@
 	// Where one pixel's taps land on screen, each marked like the kernel diagram's squares: filled
 	// if its weight is positive, hollow if negative, by area. Taps past an edge wrap around, as the
 	// step's do. Jitter, different at every pixel, isn't shown.
-	import { type Kernel, TAPS, tap_offset, tap_pixels } from "./kernel";
+	import { type Kernel, MIDDLE, TAPS, tap_offset, tap_pixels } from "./kernel";
 
 	interface Props {
 		kernel: Kernel;
@@ -38,7 +38,7 @@
 			y:        wrap(at.y - oy, height),
 			side:     Math.max(4, BIGGEST * Math.sqrt(Math.min(1, Math.abs(w)))),
 			negative: w < 0,
-			middle:   i === 12,
+			middle:   i === MIDDLE,
 		};
 	}));
 </script>

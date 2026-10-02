@@ -2,7 +2,7 @@
 import { assert, boolean, constantFrom, double, integer, property, record, stringMatching } from "fast-check";
 import { describe, expect, test } from "vitest";
 import { decode, encode } from "./codec";
-import { MAX_SEED, PRESETS, reweighted } from "./kernel";
+import { MAX_SEED, PRESETS, balanced, reweighted } from "./kernel";
 import { BIT_DEPTHS, CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, PIXEL_SIZES, SEEDS, SETTINGS_PRESETS, SLIDERS, VIEWS } from "./settings";
 
 // Adding 0 makes -0 a plain 0, which is what the URL can say.
@@ -43,6 +43,8 @@ describe("codec", () => {
 		const decoded = decode(encode(DEFAULT_SETTINGS, weights)).kernel as number[];
 		decoded.forEach((k, i) => expect(k).toBeCloseTo(weights[i]!, 5));
 		expect(decoded.reduce((s, k) => s + k, 0)).toBeCloseTo(1, 14);
+		const sparse = balanced(PRESETS.identity.with(7, 0.2).with(13, 0.1));
+		expect(decode(encode(DEFAULT_SETTINGS, sparse)).kernel).toEqual(sparse);
 		expect(decode("w=1,2,3&k=5").kernel).toBe(5);
 		expect(decode(`w=${Array.from({ length: 25 }, () => "1e308").join(",")}&k=6`).kernel).toBe(6);
 		expect(decode(`w=1e39,-1e39,${Array.from({ length: 23 }, () => "0").join(",")}&k=6`).kernel).toBe(6);
