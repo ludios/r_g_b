@@ -191,8 +191,11 @@
 </figure>
 
 <style>
+	/* As wide as the canvas and its border, whatever the font makes of the caption, so the title
+	   centers over the map and the map fits beside the diagram. */
 	figure {
 		margin: 0;
+		width: 177px;
 	}
 	.title {
 		text-align: center;

@@ -85,7 +85,8 @@
 </figure>
 
 <style>
-	/* As wide as the diagram, whatever the caption says, so nothing beside it moves. */
+	/* As wide as the diagram, whatever the caption says, so nothing beside it moves and the title
+	   centers over it. */
 	figure {
 		margin: 0;
 		width: 132px;
