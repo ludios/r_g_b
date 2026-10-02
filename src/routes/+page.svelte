@@ -12,7 +12,7 @@
 	import { CLICKS, type Click, DEFAULT_SETTINGS, MOUSE_TARGETS, type MouseTarget, BIT_DEPTHS, PIXEL_SIZES, SEEDS, SETTINGS_PRESETS, SLIDERS, type Seeds, type Settings, type SettingsPreset, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { growing } from "$lib/spectrum";
-	import { local_storage } from "$lib/storage";
+	import { local_storage, read_stored, write_stored } from "$lib/storage";
 	import { THEMES, type Theme, ThemeChoice, parse_theme } from "$lib/theme.svelte";
 
 	const log = getLogger(["r_g_b", "page"]);
@@ -21,7 +21,6 @@
 	let paused     = $state(false);
 	let steps      = $state(0);
 	let show_card  = $state(true);
-	let fade       = $state(true);
 	let opacity    = $state(1);
 	/** Steps until the next kernel, while morphing. */
 	let next_in    = $state(0);
@@ -36,24 +35,18 @@
 
 	/** The sections' stored states, or where there are none (as when prerendering), their defaults. */
 	function read_open(): Record<Section, boolean> {
-		let stored: unknown = null;
-		try {
-			stored = JSON.parse(storage?.getItem(SECTIONS_KEY) ?? "null");
-		} catch {
-			// The defaults, then.
-		}
+		const stored = read_stored(storage, SECTIONS_KEY);
 		const states = typeof stored === "object" && stored !== null ? (stored as Record<string, unknown>) : {};
 		return Object.fromEntries(Object.entries(SECTIONS).map(([name, initially]) => [name, typeof states[name] === "boolean" ? states[name] : initially])) as Record<Section, boolean>;
 	}
 
-	$effect(() => {
-		const states = JSON.stringify(open);
-		try {
-			storage?.setItem(SECTIONS_KEY, states);
-		} catch {
-			// Not kept past this page, then.
-		}
-	});
+	$effect(() => write_stored(storage, SECTIONS_KEY, open));
+
+	const FADE_KEY = "r_g_b-fade";
+	/** Whether the controls fade as the pointer leaves them, kept in localStorage; yes unless turned off. */
+	let fade = $state(read_stored(storage, FADE_KEY) !== false);
+
+	$effect(() => write_stored(storage, FADE_KEY, fade));
 
 	let canvas: HTMLCanvasElement;
 	let chrome: HTMLElement;
