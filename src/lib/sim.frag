@@ -1,4 +1,4 @@
-// One simulation step, or a fresh start. Needs WebGL2 (uint, floatBitsToUint); three.js's
+// One simulation step, a fresh start, or a brush stroke. Needs WebGL2 (uint, floatBitsToUint); three.js's
 // WebGL2 prefix #defines gl_FragColor. Alpha records which channels the clamp changed, as bits
 // R=1, G=2, B=4 over 255.
 uniform vec2 res;             // Buffer size in pixels
@@ -13,6 +13,10 @@ uniform bool starting;        // Whether to start afresh rather than step: the g
 uniform float ground;         // The gray to start from
 uniform float noise;          // How far each channel of each pixel starts from the ground, at most
 uniform vec3 wave;            // Stripes to start with: cycles per pixel across and up, and amplitude
+uniform bool painting;        // Whether to copy the previous frame with a stroke of the brush on it
+uniform vec4 stroke;          // From (x, y) to (z, w), in pixels
+uniform float brush;          // The stroke's radius in pixels
+uniform vec3 paint;           // The stroke's color
 
 // noise from http://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
 uint hash(uint x) {
@@ -56,8 +60,21 @@ vec3 step_from_previous(vec2 uv) {
 	return mix(sum.rgb, texelFetch(prev_frame, ivec2(gl_FragCoord.xy), 0).rgb, clamp(persistence, 0.0, 1.0));
 }
 
+// The distance from p to the segment from a to b.
+float distance_to_segment(vec2 p, vec2 a, vec2 b) {
+	vec2 ab = b - a;
+	float t = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+	return length(p - a - t * ab);
+}
+
 void main() {
 	vec2 uv = gl_FragCoord.xy / res;
+	if (painting) {
+		vec4 previous = texelFetch(prev_frame, ivec2(gl_FragCoord.xy), 0);
+		bool inside = distance_to_segment(gl_FragCoord.xy, stroke.xy, stroke.zw) <= brush;
+		gl_FragColor = inside ? vec4(paint, 0.0) : previous;
+		return;
+	}
 	// The noise is the same at every restart of the same size. Pixel n's center is at n + 0.5.
 	vec3 color = starting
 		? ground + noise * (2.0 * vec3(random(uv, 1u), random(uv, 2u), random(uv, 3u)) - 1.0)

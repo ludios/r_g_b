@@ -4,7 +4,7 @@
 // defaults is written. Reading is forgiving: anything missing or unreadable is the default, and
 // numbers past a slider's end are that end.
 import { type Kernel, MAX_SEED, PRESETS, type Preset, TAPS } from "./kernel";
-import { DEFAULT_SETTINGS, PARAMS, PIXEL_SIZES, type Param, SEEDS, SLIDERS, type Settings, VIEWS } from "./settings";
+import { CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, SEEDS, SLIDERS, type Settings, VIEWS } from "./settings";
 
 /** The query string's key for each setting; "k" is a random kernel's seed or a preset, "w" weights. */
 const KEYS = {
@@ -25,6 +25,9 @@ const KEYS = {
 	view:        "vw",
 	mouse_x:     "mx",
 	mouse_y:     "my",
+	click:       "ck",
+	brush:       "br",
+	paint:       "pc",
 } as const satisfies Record<keyof Settings, string>;
 
 /** A kernel as a URL names it: a random one by its seed, a preset, or weights. */
@@ -71,10 +74,11 @@ export function decode(query: string): Decoded {
 		const raw = q.get(KEYS[key]);
 		return raw === "1" ? true : raw === "0" ? false : d[key];
 	};
-	const param = (key: "mouse_x" | "mouse_y"): Param | null => {
+	const target = (key: "mouse_x" | "mouse_y"): MouseTarget | null => {
 		const raw = q.get(KEYS[key]);
-		return raw === "none" ? null : PARAMS.find((p) => p === raw) ?? d[key];
+		return raw === "none" ? null : MOUSE_TARGETS.find((t) => t === raw) ?? d[key];
 	};
+	const paint = q.get(KEYS.paint);
 	/** One of `options`, which are strings or numbers. */
 	const choice = <T>(key: keyof Settings, options: readonly T[], fallback: T): T => {
 		const raw = q.get(KEYS[key]);
@@ -97,8 +101,11 @@ export function decode(query: string): Decoded {
 			pixel:       choice("pixel", PIXEL_SIZES, d.pixel),
 			float:       flag("float"),
 			view:        choice("view", VIEWS, d.view),
-			mouse_x:     param("mouse_x"),
-			mouse_y:     param("mouse_y"),
+			mouse_x:     target("mouse_x"),
+			mouse_y:     target("mouse_y"),
+			click:       choice("click", CLICKS, d.click),
+			brush:       number("brush"),
+			paint:       paint !== null && /^#[0-9a-f]{6}$/.test(paint) ? paint : d.paint,
 		},
 		kernel: decode_kernel(q),
 	};

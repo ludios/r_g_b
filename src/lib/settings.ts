@@ -9,6 +9,19 @@ export type Param = "contrast" | "drift" | "spacing" | "jitter" | "persistence";
 export const PARAMS: readonly Param[] = ["contrast", "drift", "spacing", "jitter", "persistence"];
 
 /**
+ * What the mouse can be given: a slider, or what r_g_b.html gave mouse Y, spacing and persistence
+ * together, both exponential in the pointer's place: 0 at the top, 1/32 of the way at the middle,
+ * all the way at the bottom, where persistence 1 freezes the image.
+ */
+export type MouseTarget = Param | "r_g_b";
+
+export const MOUSE_TARGETS: readonly MouseTarget[] = [...PARAMS, "r_g_b"];
+
+/** What a click or tap on the image does; painting and erasing also drag. */
+export const CLICKS = ["kernel", "paint", "erase", "taps"] as const;
+export type Click = (typeof CLICKS)[number];
+
+/**
  * Ways to show a frame: in color; one channel alone, in gray; how much each channel changed in
  * the last step; or which channels the clamp changed in the last step.
  */
@@ -54,9 +67,13 @@ export interface Settings {
 	float: boolean;
 	/** How the canvas shows each frame. */
 	view: View;
-	/** The setting that follows the pointer across the window, or none. */
-	mouse_x: Param | null;
-	mouse_y: Param | null;
+	/** What follows the pointer across the window, or nothing. */
+	mouse_x: MouseTarget | null;
+	mouse_y: MouseTarget | null;
+	click: Click;
+	/** The paint brush's radius, in pixels of the simulation, and its color as "#rrggbb". */
+	brush: number;
+	paint: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -77,7 +94,13 @@ export const DEFAULT_SETTINGS: Settings = {
 	view:        "color",
 	mouse_x:     null,
 	mouse_y:     null,
+	click:       "kernel",
+	brush:       6,
+	paint:       "#ffffff",
 };
+
+/** Settings that play like r_g_b.html: mouse X sets the contrast, mouse Y the spacing and persistence. */
+export const LIKE_R_G_B: Settings = { ...DEFAULT_SETTINGS, mouse_x: "contrast", mouse_y: "r_g_b" };
 
 /** A slider: `positions` steps from `min` to `max`, evenly spaced or spaced by a constant ratio. */
 export interface Slider {
@@ -100,6 +123,7 @@ export const SLIDERS = {
 	speed:       { min: 1 / 32, max: 8,     scale: "log",    positions: 8 },
 	ground:      { min: 0,      max: 1,     scale: "linear", positions: 255 },
 	noise:       { min: 0,      max: 0.5,   scale: "linear", positions: 100 },
+	brush:       { min: 0.5,    max: 64,    scale: "log",    positions: 70 },
 } as const satisfies Record<string, Slider>;
 
 /**

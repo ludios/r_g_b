@@ -4,9 +4,10 @@
 	import { replaceState } from "$app/navigation";
 	import GrowthMap from "$lib/GrowthMap.svelte";
 	import KernelDiagram from "$lib/KernelDiagram.svelte";
+	import TapsOverlay from "$lib/TapsOverlay.svelte";
 	import { type KernelName, decode, encode } from "$lib/codec";
 	import { type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, next_seed, with_contrast, with_drift, with_weight } from "$lib/kernel";
-	import { DEFAULT_SETTINGS, PARAMS, PIXEL_SIZES, type Param, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
+	import { CLICKS, type Click, DEFAULT_SETTINGS, LIKE_R_G_B, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { local_storage } from "$lib/storage";
 	import { THEMES, type Theme, ThemeChoice, parse_theme } from "$lib/theme.svelte";
@@ -30,7 +31,7 @@
 	let source    = $state<Source>(kernels.source);
 	let base      = $state<Kernel>(kernels.kernel);
 	/** The last random kernel, which choosing Random goes back to; the current one while random. */
-	let last_seed = 0;
+	let last_seed: number | null = null;
 	/** The kernel the step uses: the base, with the drift and contrast applied. */
 	const shown   = $derived(shape(base));
 	const model   = $derived({ kernel: shown, spacing: settings.spacing, jitter: settings.jitter, persistence: settings.persistence });
@@ -123,7 +124,7 @@
 	function choose(choice: string): void {
 		const preset = PRESET_NAMES.find((name) => name === choice);
 		if (preset === undefined) {
-			jump(last_seed);
+			jump(last_seed ?? random_seed());
 			return;
 		}
 		kernels.choose(preset);
@@ -140,8 +141,13 @@
 		sync();
 	}
 
+	/** A random kernel number, small enough to read. */
+	function random_seed(): number {
+		return Math.floor(Math.random() * 1_000_000);
+	}
+
 	function new_kernel(): void {
-		jump(Math.floor(Math.random() * 1_000_000));
+		jump(random_seed());
 	}
 
 	/** Takes a typed seed once the user is done with it, rather than every half-typed number. */
@@ -150,7 +156,7 @@
 		if (Number.isInteger(typed) && typed >= 0 && typed <= MAX_SEED) {
 			jump(typed);
 		}
-		event.currentTarget.value = String(last_seed);
+		event.currentTarget.value = String(last_seed ?? "");
 	}
 
 	function step_once(): void {
@@ -202,6 +208,57 @@
 		settings[key] = value_at(SLIDERS[key], event.currentTarget.valueAsNumber);
 	}
 
+	/** Puts the settings back to some set of them; the kernel stays, but a preset or edit goes back to random for r_g_b.html. */
+	function reset(to: Settings): void {
+		settings = { ...to };
+		if (to === LIKE_R_G_B && source.kind !== "seed") {
+			jump(last_seed ?? random_seed());
+		}
+	}
+
+	/** Where the screen pixel at `x`, `y` from the top left is in the simulation, from the bottom left. */
+	function to_buffer(x: number, y: number): { x: number; y: number } {
+		return { x: x / settings.pixel, y: height - y / settings.pixel };
+	}
+
+	/** The last point of a stroke being painted, in the simulation's pixels. */
+	let stroke: { x: number; y: number } | null = null;
+	/** The screen pixel whose taps are shown, if any. */
+	let taps_at = $state<{ x: number; y: number } | null>(null);
+
+	/** `level`, 0 to 1, as a gray "#rrggbb". */
+	function gray(level: number): string {
+		return "#" + Math.round(level * 255).toString(16).padStart(2, "0").repeat(3);
+	}
+
+	/** Paints from the stroke's last point to the pointer, or starts a stroke there. */
+	function paint_to(event: PointerEvent): void {
+		const at = to_buffer(event.clientX, event.clientY);
+		sim?.paint(stroke ?? at, at, settings.brush, settings.click === "erase" ? gray(settings.ground) : settings.paint);
+		stroke = at;
+	}
+
+	function on_canvas_down(event: PointerEvent & { currentTarget: HTMLCanvasElement }): void {
+		if (settings.click === "paint" || settings.click === "erase") {
+			event.currentTarget.setPointerCapture(event.pointerId);
+			stroke = null;
+			paint_to(event);
+		}
+	}
+
+	function on_canvas_move(event: PointerEvent): void {
+		if (stroke !== null) {
+			paint_to(event);
+		}
+	}
+
+	function on_canvas_click(event: MouseEvent): void {
+		if (settings.click === "kernel") {
+			new_kernel();
+		} else if (settings.click === "taps") {
+			taps_at = { x: event.clientX, y: event.clientY };
+		}
+	}
 
 	/** The settings given to the mouse follow it, and the controls fade with distance from it. */
 	function on_pointer_move(event: PointerEvent): void {
@@ -220,13 +277,19 @@
 	}
 
 	/**
-	 * Moves a setting's slider to the pointer's place across the window.
+	 * Moves what the mouse is given to the pointer's place across the window.
 	 * @param along 0 at the left or top, 1 at the right or bottom.
 	 */
-	function follow(param: Param | null, along: number): void {
-		if (param !== null) {
-			const slider: Slider = SLIDERS[param];
-			settings[param] = value_at(slider, Math.round(along * slider.positions));
+	function follow(target: MouseTarget | null, along: number): void {
+		if (target === "r_g_b") {
+			// r_g_b.html's easeInExpo, and its spacing of up to a third of the height.
+			const e = along === 0 ? 0 : Math.pow(2, 10 * along - 10);
+			const spacing = (e * window.innerHeight) / settings.pixel / 3;
+			settings.spacing     = Number(Math.min(SLIDERS.spacing.max, Math.max(SLIDERS.spacing.min, spacing)).toPrecision(4));
+			settings.persistence = Number(e.toPrecision(4));
+		} else if (target !== null) {
+			const slider: Slider = SLIDERS[target];
+			settings[target] = value_at(slider, Math.round(along * slider.positions));
 		}
 	}
 
@@ -258,7 +321,8 @@
 		return speed >= 1 ? `${speed} per frame` : `1 per ${Math.round(1 / speed)} frames`;
 	}
 
-	const PARAM_LABELS:  Record<Param, string>  = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence" };
+	const MOUSE_LABELS:  Record<MouseTarget, string> = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence", r_g_b: "Spacing + persistence" };
+	const CLICK_LABELS:  Record<Click, string>  = { kernel: "New kernel", paint: "Paint", erase: "Erase", taps: "Show taps" };
 	const PRESET_LABELS: Record<Preset, string> = { identity: "Identity", box: "Box blur", shift: "Shift", row: "One row", ring: "Center-surround", checker: "Checkerboard" };
 	const SEED_LABELS:  Record<Seeds, string> = { rgb: "R G B dots", white: "White dot", pixel: "One pixel", none: "None" };
 	const VIEW_LABELS:  Record<View, string>  = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
@@ -271,7 +335,12 @@
 
 <svelte:window onpointermove={on_pointer_move} onmouseout={on_mouse_out} onkeydown={on_key} onresize={() => restart()} />
 
-<canvas bind:this={canvas} onclick={new_kernel} style:width="{width * settings.pixel}px" style:height="{height * settings.pixel}px"></canvas>
+<canvas bind:this={canvas} onclick={on_canvas_click} onpointerdown={on_canvas_down} onpointermove={on_canvas_move} onpointerup={() => (stroke = null)}
+	style:width="{width * settings.pixel}px" style:height="{height * settings.pixel}px"></canvas>
+
+{#if settings.click === "taps" && taps_at !== null}
+	<TapsOverlay kernel={shown} spacing={settings.spacing} pixel={settings.pixel} at={taps_at} width={width * settings.pixel} height={height * settings.pixel} />
+{/if}
 
 <div class="chrome" bind:this={chrome} style:opacity={fade ? opacity : 1}>
 	<button type="button" class="toggle" onclick={() => (show_card = !show_card)}>{show_card ? "Hide controls" : "Show controls"}</button>
@@ -304,9 +373,9 @@
 						<div class="row">
 							<span>Number</span>
 							<div class="seed">
-								<button type="button" onclick={() => jump(last_seed - 1)} aria-label="Previous kernel">‹</button>
+								<button type="button" onclick={() => jump((last_seed ?? 0) - 1)} aria-label="Previous kernel">‹</button>
 								<input type="number" min="0" max={MAX_SEED} step="1" value={source.seed} onchange={commit_seed} aria-label="Kernel number" />
-								<button type="button" onclick={() => jump(last_seed + 1)} aria-label="Next kernel">›</button>
+								<button type="button" onclick={() => jump((last_seed ?? 0) + 1)} aria-label="Next kernel">›</button>
 							</div>
 							<output>{settings.morph ? `to ${next_seed(source.seed)}` : ""}</output>
 						</div>
@@ -417,20 +486,39 @@
 					<div class="row">
 						<span>Mouse</span>
 						<div class="choices">
-							<label>X <select bind:value={settings.mouse_x}>
-								<option value={null}>nothing</option>
-								{#each PARAMS as param (param)}
-									<option value={param}>{PARAM_LABELS[param]}</option>
-								{/each}
-							</select></label>
-							<label>Y <select bind:value={settings.mouse_y}>
-								<option value={null}>nothing</option>
-								{#each PARAMS as param (param)}
-									<option value={param}>{PARAM_LABELS[param]}</option>
-								{/each}
-							</select></label>
+							{#each [["X", "mouse_x"], ["Y", "mouse_y"]] as const as [axis, key] (key)}
+								<label>{axis} <select bind:value={settings[key]}>
+									<option value={null}>nothing</option>
+									{#each MOUSE_TARGETS as target (target)}
+										<option value={target}>{MOUSE_LABELS[target]}</option>
+									{/each}
+								</select></label>
+							{/each}
 						</div>
 					</div>
+					<div class="row">
+						<span>Click</span>
+						<div class="choices">
+							{#each CLICKS as click (click)}
+								<label><input type="radio" name="click" bind:group={settings.click} value={click} /> {CLICK_LABELS[click]}</label>
+							{/each}
+						</div>
+					</div>
+					{#if settings.click === "paint" || settings.click === "erase"}
+						<label class="row">
+							<span>Brush</span>
+							<input type="range" min="0" max={SLIDERS.brush.positions} value={position_of(SLIDERS.brush, settings.brush)} oninput={(e) => slide("brush", e)}
+								aria-valuetext="{settings.brush} px" />
+							<output>{settings.brush} px</output>
+						</label>
+					{/if}
+					{#if settings.click === "paint"}
+						<label class="row">
+							<span>Color</span>
+							<input type="color" bind:value={settings.paint} />
+							<output>{settings.paint}</output>
+						</label>
+					{/if}
 					<div class="row">
 						<span>Controls</span>
 						<div class="choices">
@@ -441,6 +529,8 @@
 			</form>
 
 			<footer class="actions">
+				<button type="button" onclick={() => reset(DEFAULT_SETTINGS)}>Reset settings</button>
+				<button type="button" onclick={() => reset(LIKE_R_G_B)}>Like r_g_b.html</button>
 				<label class="theme">
 					<span>Theme</span>
 					<select value={theme.theme} onchange={(e) => theme.set(parse_theme(e.currentTarget.value))}>
@@ -571,6 +661,13 @@
 	}
 	input[type="checkbox"] {
 		margin: 0;
+	}
+	input[type="color"] {
+		width: 100%;
+		height: 20px;
+		padding: 0 2px;
+		background: var(--card);
+		border: 1px solid var(--rule-strong);
 	}
 
 	.wide {

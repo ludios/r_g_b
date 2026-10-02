@@ -1,9 +1,9 @@
 // Model-output: Claude Opus 5.5
-import { assert, boolean, constantFrom, double, integer, property, record } from "fast-check";
+import { assert, boolean, constantFrom, double, integer, property, record, stringMatching } from "fast-check";
 import { describe, expect, test } from "vitest";
 import { decode, encode } from "./codec";
 import { MAX_SEED, PRESETS, with_weight } from "./kernel";
-import { DEFAULT_SETTINGS, PARAMS, PIXEL_SIZES, SEEDS, SLIDERS, VIEWS } from "./settings";
+import { CLICKS, DEFAULT_SETTINGS, MOUSE_TARGETS, PIXEL_SIZES, SEEDS, SLIDERS, VIEWS } from "./settings";
 
 // Adding 0 makes -0 a plain 0, which is what the URL can say.
 const slider = (key: keyof typeof SLIDERS) => double({ min: SLIDERS[key].min, max: SLIDERS[key].max, noNaN: true }).map((v) => v + 0);
@@ -23,8 +23,11 @@ const settings = record({
 	pixel:       constantFrom(...PIXEL_SIZES),
 	float:       boolean(),
 	view:        constantFrom(...VIEWS),
-	mouse_x:     constantFrom(null, ...PARAMS),
-	mouse_y:     constantFrom(null, ...PARAMS),
+	mouse_x:     constantFrom(null, ...MOUSE_TARGETS),
+	mouse_y:     constantFrom(null, ...MOUSE_TARGETS),
+	click:       constantFrom(...CLICKS),
+	brush:       slider("brush"),
+	paint:       stringMatching(/^#[0-9a-f]{6}$/),
 });
 
 describe("codec", () => {

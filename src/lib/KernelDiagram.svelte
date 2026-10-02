@@ -70,16 +70,18 @@
 	</svg>
 	<figcaption>
 		{#if active === null}
-			Drag a weight up or down.
+			Drag to edit.
 		{:else}
-			Tap {offset(active)}: {kernel[active]!.toFixed(3)}
+			{offset(active)}: {kernel[active]!.toFixed(3)}
 		{/if}
 	</figcaption>
 </figure>
 
 <style>
+	/* As wide as the diagram, whatever the caption says, so nothing beside it moves. */
 	figure {
 		margin: 0;
+		width: 112px;
 	}
 	svg {
 		display: block;
@@ -107,5 +109,6 @@
 		color: var(--text-muted);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
+		overflow: hidden;
 	}
 </style>

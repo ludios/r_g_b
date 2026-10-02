@@ -90,6 +90,10 @@ export class Simulation {
 		ground:      { value: 0 },
 		noise:       { value: 0 },
 		wave:        { value: new THREE.Vector3() },
+		painting:    { value: false },
+		stroke:      { value: new THREE.Vector4() },
+		brush:       { value: 0 },
+		paint:       { value: new THREE.Color() },
 	};
 	#screen_uniforms = {
 		current:  { value: null as THREE.Texture | null },
@@ -185,6 +189,27 @@ export class Simulation {
 
 		this.renderer.setRenderTarget(this.#next);
 		this.renderer.render(this.#sim_scene, this.#camera);
+		[this.#current, this.#next] = [this.#next, this.#current];
+	}
+
+	/**
+	 * Paints a stroke into the latest frame. Like a step, it makes a new frame, so the one before is
+	 * the frame without the stroke.
+	 * @param from The stroke's start, in pixels from the bottom left.
+	 * @param to Its end.
+	 * @param radius In pixels.
+	 * @param color "#rrggbb".
+	 */
+	paint(from: { x: number; y: number }, to: { x: number; y: number }, radius: number, color: string): void {
+		const u = this.#sim_uniforms;
+		u.prev_frame.value = this.#current.texture;
+		u.stroke.value.set(from.x, from.y, to.x, to.y);
+		u.brush.value = radius;
+		u.paint.value.set(color);
+		u.painting.value = true;
+		this.renderer.setRenderTarget(this.#next);
+		this.renderer.render(this.#sim_scene, this.#camera);
+		u.painting.value = false;
 		[this.#current, this.#next] = [this.#next, this.#current];
 	}
 
