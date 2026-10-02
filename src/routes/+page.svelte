@@ -886,7 +886,10 @@
 	.row > span:first-child, .row > .check {
 		font-size: 12px;
 	}
-	/* A row of choices has no readout, so it runs to the edge. */
+	/* A row of choices has no readout, so it runs to the edge; when they wrap, the label stays with the first line. */
+	.row:has(> .choices) {
+		align-items: baseline;
+	}
 	.row > .choices {
 		grid-column: 2 / -1;
 	}
@@ -898,11 +901,15 @@
 		white-space: nowrap;
 	}
 
+	/* The text gives the baseline; a box's own baseline is its bottom edge, so it's centered instead. */
 	.check, .choices label {
 		display: inline-flex;
-		align-items: center;
+		align-items: baseline;
 		gap: 4px;
 		white-space: nowrap;
+	}
+	.check > input, .choices label > input {
+		align-self: center;
 	}
 	.choices {
 		display: flex;
