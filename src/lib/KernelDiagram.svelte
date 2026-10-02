@@ -47,7 +47,7 @@
 	let draft    = $state<{ text: string; typed: boolean } | null>(null);
 	let field    = $state<HTMLInputElement>();
 	let diagram  = $state<SVGSVGElement>();
-	/** Whether the diagram itself has focus, so the arrow keys choose taps. */
+	/** Whether the diagram itself has the keyboard's focus, so the arrow keys choose taps. */
 	let focused  = $state(false);
 	/**
 	 * The tap pressed, by which pointer, and where; once it's moved far enough to be a drag, where
@@ -249,7 +249,7 @@
 	<svg bind:this={diagram} viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} tabindex="0" role="application"
 		aria-label="The kernel's 25 weights: the arrow keys choose a tap, and a number sets it"
 		onpointermove={move} onpointerup={release} onpointercancel={release} onpointerleave={() => (hover = null)}
-		onkeydown={on_diagram_key} onfocus={() => (focused = true)} onblur={() => (focused = false)}>
+		onkeydown={on_diagram_key} onfocus={() => (focused = diagram!.matches(":focus-visible"))} onblur={() => (focused = false)}>
 		{#each { length: TAPS } as _, i (i)}
 			{@const { x, y } = cell(i)}
 			{@const w = kernel[i]!}
