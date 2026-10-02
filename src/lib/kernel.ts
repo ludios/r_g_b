@@ -50,7 +50,7 @@ export const PRESETS = {
 	/** Every pixel takes the value one tap to its right, so the image moves left. */
 	shift:    kernel_of((x, y) => Number(x === 1 && y === 0)),
 	/** A shift blurred: half a tap left a step, fading as it goes. */
-	lean:     kernel_of((x, y) => (y === 0 ? ({ [-1]: 0.25, 1: 0.75 } as Record<number, number>)[x] ?? 0 : 0)),
+	lean:     kernel_of((x, y) => (y === 0 ? [0, 0.25, 0, 0.75, 0][x + 2]! : 0)),
 	/** A blur over taps two apart, so pixels split into lattices that never mix, but for jitter. */
 	skip:     kernel_of((x, y) => (x === 0 && y === 0 ? 0.5 : (x === 0 || y === 0) && Math.abs(x + y) === 2 ? 0.125 : 0)),
 	/** Only the middle row: stripes 6 taps apart grow along it; up and down, nothing is chosen. */
@@ -66,7 +66,7 @@ export const PRESETS = {
 	/** Negative middle, positive neighbors: the checkerboard doubles and inverts every step. */
 	checker:  kernel_of((x, y) => (x === 0 && y === 0 ? -0.5 : Math.abs(x) + Math.abs(y) === 1 ? 0.375 : 0)),
 	/** Identity plus a lopsided pair: stripes 4 taps apart grow as they slide. Drift 0 is the identity. */
-	advect:   kernel_of((x, y) => (y === 0 ? ({ [-1]: -0.5, 0: 1, 1: 0.5 } as Record<number, number>)[x] ?? 0 : 0)),
+	advect:   kernel_of((x, y) => (y === 0 ? [0, -0.5, 1, 0.5, 0][x + 2]! : 0)),
 } satisfies Record<string, Kernel>;
 
 export type Preset = keyof typeof PRESETS;
