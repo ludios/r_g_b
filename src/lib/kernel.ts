@@ -71,8 +71,6 @@ export const PRESETS = {
 
 export type Preset = keyof typeof PRESETS;
 
-
-
 /** A standard normal deviate, by Box-Muller. */
 function random_normal(random: () => number): number {
 	const u = 1 - random(); // (0, 1], so the log is finite
