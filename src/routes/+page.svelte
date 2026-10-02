@@ -749,11 +749,16 @@
 				</div>
 			</details>
 
+			<div class="row">
+				<span>Presets</span>
+				<div class="choices presets">
+					{#each SETTINGS_PRESET_NAMES as preset (preset)}
+						<button type="button" onclick={() => apply(preset)}>{SETTINGS_PRESET_LABELS[preset]}</button>
+					{/each}
+				</div>
+			</div>
 			<footer class="actions">
 				<button type="button" onclick={reset}>Reset settings</button>
-				{#each SETTINGS_PRESET_NAMES as preset (preset)}
-					<button type="button" onclick={() => apply(preset)}>{SETTINGS_PRESET_LABELS[preset]}</button>
-				{/each}
 				<label class="theme">
 					<span>Theme</span>
 					<select value={theme.theme} onchange={(e) => theme.set(parse_theme(e.currentTarget.value))}>
@@ -965,7 +970,7 @@
 		gap: 4px;
 		margin: 4px 0 6px;
 	}
-	.tools button {
+	.tools button, .presets button {
 		padding: 0 7px;
 		font-size: 12px;
 		line-height: 20px;
