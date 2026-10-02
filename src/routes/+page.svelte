@@ -447,15 +447,19 @@
 
 	/** Space pauses, Enter steps, and Z and shift-Z undo and redo, except where they already mean something. */
 	function on_key(event: KeyboardEvent): void {
-		if (event.target instanceof Element && event.target.closest("input, select, button, textarea, summary")) {
+		if (event.target instanceof Element && event.target.closest("input, select, button, textarea, summary, a[href]")) {
 			return;
 		}
-		if (event.code === "Space") {
+		// Keys by what they type, so Z is Z on any layout, and either Enter steps.
+		if (event.key === " ") {
 			event.preventDefault();
-			toggle_pause();
-		} else if (event.code === "Enter" && paused) {
+			// Holding it down would flip back and forth.
+			if (!event.repeat) {
+				toggle_pause();
+			}
+		} else if (event.key === "Enter" && paused) {
 			step_once();
-		} else if (event.code === "KeyZ" && !event.altKey) {
+		} else if (event.key.toLowerCase() === "z" && !event.altKey) {
 			event.preventDefault();
 			if (event.shiftKey) {
 				travel(undone, done);
