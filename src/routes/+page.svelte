@@ -882,6 +882,7 @@
 	}
 
 	select {
+		font-size: 12px;
 		padding: 1px 2px;
 		background: var(--card);
 		border: 1px solid var(--rule-strong);
@@ -1019,11 +1020,11 @@
 		gap: 4px;
 		margin: 4px 0 6px;
 	}
-	.tools button, .presets button, .readout button {
+	.tools button, .presets button, .pick button, .readout button {
 		padding: 0 7px;
 		font-size: 12px;
 	}
-	.tools button, .presets button {
+	.tools button, .presets button, .pick button {
 		line-height: 20px;
 	}
 	/* A readout led by a button that puts its slider back to the middle of a two-sided range, which a
