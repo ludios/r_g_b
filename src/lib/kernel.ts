@@ -41,10 +41,19 @@ function kernel_of(weight: (x: number, y: number) => number): Kernel {
 	return Array.from({ length: TAPS }, (_, i) => weight(tap_offset(i).x, tap_offset(i).y));
 }
 
-/** The circles preset's weight at `x`, `y`: the same all around each ring of taps. */
-function circle_weight(x: number, y: number): number {
-	return ({ 0: 0.96, 1: 0.37, 2: -0.08, 4: -0.13, 5: -0.07, 8: -0.01 })[x * x + y * y] ?? 0;
+/**
+ * Weights the same all around each ring of taps, for kernel_of.
+ * @param weights The weight for each x^2 + y^2 the taps have.
+ */
+function by_ring(weights: Record<0 | 1 | 2 | 4 | 5 | 8, number>): (x: number, y: number) => number {
+	return (x, y) => weights[(x * x + y * y) as keyof typeof weights];
 }
+
+/** The row preset's weights, from x = -2 to 2. */
+const ROW = [-0.25, 0.5, 0.5, 0.5, -0.25];
+
+/** The circles preset's weights. */
+const circle_weight = by_ring({ 0: 0.96, 1: 0.37, 2: -0.08, 4: -0.13, 5: -0.07, 8: -0.01 });
 
 /** Kernels that each show one behavior, by name. */
 export const PRESETS = {
@@ -59,14 +68,14 @@ export const PRESETS = {
 	/** A blur over taps two apart, so pixels split into lattices that never mix, but for jitter. */
 	skip:     kernel_of((x, y) => (x === 0 && y === 0 ? 0.5 : (x === 0 || y === 0) && Math.abs(x + y) === 2 ? 0.125 : 0)),
 	/** Only the middle row: stripes 6 taps apart grow along it; up and down, nothing is chosen. */
-	row:      kernel_of((x, y) => (y === 0 ? [-0.25, 0.5, 0.5, 0.5, -0.25][x + 2]! : 0)),
+	row:      kernel_of((x, y) => (y === 0 ? ROW[x + 2]! : 0)),
 	/** Blurs across, sharpens up and down: bands 2 taps tall double every step. */
 	saddle:   kernel_of((x, y) => (x === 0 && y === 0 ? 1 : y === 0 && Math.abs(x) === 1 ? 0.25 : x === 0 && Math.abs(y) === 1 ? -0.25 : 0)),
 	/**
 	 * Positive middle, negative edge: stripes about 4.5 taps apart grow, upright and level ones
 	 * fastest (2.4 times a step, against 2 at 45 degrees), so a dot grows into squares.
 	 */
-	ring:     kernel_of((x, y) => ({ 0: 0.76, 1: 0.35, 2: 0.12, 4: -0.075, 5: -0.11, 8: -0.115 })[x * x + y * y] ?? 0),
+	ring:     kernel_of(by_ring({ 0: 0.76, 1: 0.35, 2: 0.12, 4: -0.075, 5: -0.11, 8: -0.115 })),
 	/** The ring retuned: stripes about 4.2 taps apart grow alike at any angle, so a dot grows into circles. */
 	circles:  kernel_of(circle_weight),
 	/**
@@ -94,7 +103,7 @@ export const PRESETS = {
 	 * The row a tap lower: everything rises a tap a step as stripes 6 taps apart grow across it, so
 	 * a seed stamped every step trails a V-shaped plume.
 	 */
-	rise:     kernel_of((x, y) => (y === -1 ? [-0.25, 0.5, 0.5, 0.5, -0.25][x + 2]! : 0)),
+	rise:     kernel_of((x, y) => (y === -1 ? ROW[x + 2]! : 0)),
 	/**
 	 * The image editors' emboss: the identity plus x - y over the middle 3x3, lopsided as advect
 	 * is, but diagonally. Stripes 4.7 taps apart running up and right grow 7 times a step as they
