@@ -39,6 +39,14 @@ export type Seeds = (typeof SEEDS)[number];
 /** How many screen pixels one pixel of the simulation covers, across and down. */
 export const PIXEL_SIZES = [1, 2, 4, 8] as const;
 
+/**
+ * Bits per channel of the buffers: bytes, which round each step to 1/255, or half or whole floats.
+ * A step's change smaller than half a rounding is lost, so a blur stops before it's flat, and the
+ * finer the rounding, the flatter it gets first.
+ */
+export const PRECISIONS = [8, 16, 32] as const;
+export type Precision = (typeof PRECISIONS)[number];
+
 export interface Settings {
 	/** Scales each kernel weight's deviation from flat; 1 is the kernel as generated. */
 	contrast: number;
@@ -67,8 +75,7 @@ export interface Settings {
 	noise: number;
 	/** One of PIXEL_SIZES. */
 	pixel: number;
-	/** Whether the buffers hold half floats, rather than bytes that round to 1/255. */
-	float: boolean;
+	precision: Precision;
 	/** How the canvas shows each frame. */
 	view: View;
 	/** What follows the pointer across the window, or nothing. */
@@ -94,7 +101,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	ground:      0.05,
 	noise:       0,
 	pixel:       1,
-	float:       false,
+	precision:   8,
 	view:        "color",
 	mouse_x:     null,
 	mouse_y:     null,

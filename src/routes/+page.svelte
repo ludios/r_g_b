@@ -9,7 +9,7 @@
 	import TapsOverlay from "$lib/TapsOverlay.svelte";
 	import { type KernelName, decode, encode } from "$lib/codec";
 	import { BALANCES, type Balance, GROUPS, type Group, type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, TRANSFORMS, type Transform, group_of, mutated, next_seed, with_contrast, with_delta, with_drift } from "$lib/kernel";
-	import { CLICKS, type Click, DEFAULT_SETTINGS, LIKE_R_G_B, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
+	import { CLICKS, type Click, DEFAULT_SETTINGS, LIKE_R_G_B, MOUSE_TARGETS, type MouseTarget, PIXEL_SIZES, PRECISIONS, type Precision, SEEDS, SLIDERS, type Seeds, type Settings, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { growing } from "$lib/spectrum";
 	import { local_storage } from "$lib/storage";
@@ -107,7 +107,7 @@
 	function restart(wave?: { fx: number; fy: number }): void {
 		const w = Math.ceil(window.innerWidth / settings.pixel);
 		const h = Math.ceil(window.innerHeight / settings.pixel);
-		sim?.restart({ width: w, height: h, ground: settings.ground, noise: settings.noise, seeds: settings.seeds, float: settings.float, wave });
+		sim?.restart({ width: w, height: h, ground: settings.ground, noise: settings.noise, seeds: settings.seeds, precision: settings.precision, wave });
 		// Written, not read, so the effect below doesn't depend on them.
 		width  = w;
 		height = h;
@@ -493,9 +493,10 @@
 	A.eq(PRESET_GROUPS.flatMap(([, names]) => names).toSorted().join(), PRESET_NAMES.toSorted().join());
 	const GROUP_LABELS:   Record<Group, string>   = { tap: "one tap", pair: "a tap and the one opposite", ring: "a tap's whole ring" };
 	const BALANCE_LABELS: Record<Balance, string> = { middle: "the middle tap", others: "all the other taps" };
-	const SEED_LABELS:  Record<Seeds, string> = { rgb: "R G B dots", white: "White dot", pixel: "One pixel", none: "None" };
-	const VIEW_LABELS:  Record<View, string>  = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
-	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
+	const SEED_LABELS:      Record<Seeds, string>     = { rgb: "R G B dots", white: "White dot", pixel: "One pixel", none: "None" };
+	const PRECISION_LABELS: Record<Precision, string> = { 8: "8-bit", 16: "16-bit float", 32: "32-bit float" };
+	const VIEW_LABELS:      Record<View, string>      = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
+	const THEME_LABELS:     Record<Theme, string>     = { system: "Browser's theme", light: "Light", dark: "Dark" };
 </script>
 
 <svelte:head>
@@ -668,7 +669,14 @@
 							{#each PIXEL_SIZES as pixel (pixel)}
 								<label><input type="radio" name="pixel" bind:group={settings.pixel} value={pixel} /> {pixel}</label>
 							{/each}
-							<label><input type="checkbox" bind:checked={settings.float} /> Float buffers</label>
+						</div>
+					</div>
+					<div class="row">
+						<span>Precision</span>
+						<div class="choices">
+							{#each PRECISIONS as precision (precision)}
+								<label><input type="radio" name="precision" bind:group={settings.precision} value={precision} /> {PRECISION_LABELS[precision]}</label>
+							{/each}
 						</div>
 					</div>
 				</details>

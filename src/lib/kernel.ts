@@ -45,7 +45,7 @@ function kernel_of(weight: (x: number, y: number) => number): Kernel {
 export const PRESETS = {
 	/** Every pixel stays as it is. */
 	identity: kernel_of((x, y) => Number(x === 0 && y === 0)),
-	/** An even blur, under which everything fades to flat. */
+	/** An even blur, under which everything fades to flat, or as near as rounding lets it. */
 	box:      kernel_of(() => FLAT),
 	/** Every pixel takes the value one tap to its right, so the image moves left. */
 	shift:    kernel_of((x, y) => Number(x === 1 && y === 0)),

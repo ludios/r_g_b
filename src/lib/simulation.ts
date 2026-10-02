@@ -3,12 +3,19 @@
 // The simulation on the GPU: ping-pong buffers, the step shader, and drawing to the canvas.
 import * as THREE from "three";
 import type { Kernel } from "./kernel";
-import { type Seeds, VIEWS, type View } from "./settings";
+import { type Precision, type Seeds, VIEWS, type View } from "./settings";
 import screen_shader from "./screen.frag?raw";
 import sim_shader from "./sim.frag?raw";
 
 /** How far a planted wave's stripes swing from the ground. */
 const WAVE = 0.05;
+
+/** What a buffer's texels are, for each precision. */
+const TEXEL_TYPES = {
+	8:  THREE.UnsignedByteType,
+	16: THREE.HalfFloatType,
+	32: THREE.FloatType,
+} as const satisfies Record<Precision, THREE.TextureDataType>;
 
 /** What a restart starts from. */
 export interface StartSettings {
@@ -20,8 +27,8 @@ export interface StartSettings {
 	/** How far each channel of each pixel starts from the ground, at most. */
 	noise: number;
 	seeds: Seeds;
-	/** Whether the buffers hold half floats rather than bytes, which round to 1/255. */
-	float: boolean;
+	/** Bits per channel of the buffers. */
+	precision: Precision;
 	/** Faint stripes to start with, in cycles per pixel across and up, if any. */
 	wave?: { fx: number; fy: number };
 }
@@ -120,15 +127,15 @@ export class Simulation {
 		const screen_material = new THREE.ShaderMaterial({ uniforms: this.#screen_uniforms, fragmentShader: screen_shader });
 		this.#screen_scene = new THREE.Scene().add(new THREE.Mesh(quad, screen_material));
 
-		this.#current = Simulation.#target(false);
-		this.#next    = Simulation.#target(false);
+		this.#current = Simulation.#target(8);
+		this.#next    = Simulation.#target(8);
 	}
 
 	/** A buffer for restart() to size. */
-	static #target(float: boolean): THREE.WebGLRenderTarget {
+	static #target(precision: Precision): THREE.WebGLRenderTarget {
 		// The step reads whole texels itself; showing a buffer on the canvas never blends them.
 		return new THREE.WebGLRenderTarget(1, 1, {
-			type:          float ? THREE.HalfFloatType : THREE.UnsignedByteType,
+			type:          TEXEL_TYPES[precision],
 			minFilter:     THREE.NearestFilter,
 			magFilter:     THREE.NearestFilter,
 			depthBuffer:   false,
@@ -152,9 +159,9 @@ export class Simulation {
 		// Freed here (along with anything left from a lost context); reallocated on first use.
 		this.#current.dispose();
 		this.#next.dispose();
-		if ((this.#current.texture.type === THREE.HalfFloatType) !== start.float) {
-			this.#current = Simulation.#target(start.float);
-			this.#next    = Simulation.#target(start.float);
+		if (this.#current.texture.type !== TEXEL_TYPES[start.precision]) {
+			this.#current = Simulation.#target(start.precision);
+			this.#next    = Simulation.#target(start.precision);
 		}
 		this.#current.setSize(width, height);
 		this.#next.setSize(width, height);
