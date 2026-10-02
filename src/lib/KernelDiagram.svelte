@@ -69,6 +69,11 @@
 		return `(${tap_offset(i).x}, ${tap_offset(i).y})`;
 	}
 
+	/** A weight to three places, where one too small to show is 0, not -0. */
+	function format(weight: number): string {
+		return (Math.abs(weight) < 0.0005 ? 0 : weight).toFixed(3);
+	}
+
 	/**
 	 * Presses tap `index` with the primary button, unless another pointer already is, first taking
 	 * what's typed, as leaving the field would.
@@ -103,8 +108,9 @@
 	}
 
 	/**
-	 * Ends the pointer's press. One that didn't drag and wasn't cancelled was a click, which selects
-	 * its tap or, if it already was or it's the middle, unselects it.
+	 * Ends the pointer's press, on pointerup, or if it's cancelled or the diagram loses it. One that
+	 * didn't drag and ended in pointerup was a click, which selects its tap or, if it already was or
+	 * it's the middle, unselects it.
 	 */
 	function release(event: PointerEvent): void {
 		if (press === null || event.pointerId !== press.pointer) {
@@ -125,7 +131,7 @@
 
 	/** Holds the field's text still, at the selected tap's weight. */
 	function hold(): void {
-		draft = selected === null ? null : { text: kernel[selected]!.toFixed(3), typed: false };
+		draft = selected === null ? null : { text: format(kernel[selected]!), typed: false };
 	}
 
 	/**
@@ -171,7 +177,7 @@
 <figure>
 	<div class="figure-title">Hinton diagram</div>
 	<svg viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} role="img" aria-label="The kernel's 25 weights"
-		onpointermove={move} onpointerup={release} onpointercancel={release} onpointerleave={() => (hover = null)}>
+		onpointermove={move} onpointerup={release} onpointercancel={release} onlostpointercapture={release} onpointerleave={() => (hover = null)}>
 		{#each { length: TAPS } as _, i (i)}
 			{@const { x, y } = cell(i)}
 			{@const w = kernel[i]!}
@@ -189,11 +195,11 @@
 				Drag or click to edit.
 			{:else if subject === selected}
 				{offset(subject)}
-				<input bind:this={field} type="number" step="0.001" min={-MOST} max={MOST} value={draft?.text ?? kernel[subject]!.toFixed(3)}
+				<input bind:this={field} type="number" step="0.001" min={-MOST} max={MOST} value={draft?.text ?? format(kernel[subject]!)}
 					onfocus={hold} oninput={(e) => (draft = { text: e.currentTarget.value, typed: true })} onblur={leave} onkeydown={on_field_key}
 					aria-label="Weight of tap {offset(subject)}" />
 			{:else}
-				{offset(subject)}: {kernel[subject]!.toFixed(3)}
+				{offset(subject)}: {format(kernel[subject]!)}
 			{/if}
 		</div>
 		<div class="line"><span class="accent">Middle</span>: 1 − the rest.</div>
