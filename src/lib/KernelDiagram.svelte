@@ -17,7 +17,7 @@
 
 	let { kernel, group, onstart, onedit }: Props = $props();
 
-	const CELL = 22;
+	const CELL = 26;
 	/** How much a weight changes per pixel of drag. */
 	const PER_PX = 0.005;
 
@@ -87,7 +87,7 @@
 	/* As wide as the diagram, whatever the caption says, so nothing beside it moves. */
 	figure {
 		margin: 0;
-		width: 112px;
+		width: 132px;
 	}
 	svg {
 		display: block;

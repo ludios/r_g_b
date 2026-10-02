@@ -20,7 +20,7 @@
 
 	let { model, theme, onplant, ongrow, caption = $bindable("") }: Props = $props();
 
-	const SIZE = 121;
+	const SIZE = 175;
 	/** Redrawn at most this often, since a morphing kernel changes every frame. */
 	const EVERY_MS = 100;
 
@@ -167,8 +167,8 @@
 	/* color, background-color, caret-color and outline-color carry the palette to draw(). */
 	canvas {
 		display: block;
-		width: 121px;
-		height: 121px;
+		width: 175px;
+		height: 175px;
 		color: var(--accent);
 		background-color: var(--card);
 		caret-color: var(--text);

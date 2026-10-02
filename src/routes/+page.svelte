@@ -22,6 +22,30 @@
 	/** Steps until the next kernel, while morphing. */
 	let next_in    = $state(0);
 	const theme    = new ThemeChoice(local_storage());
+	const storage  = local_storage();
+	const CLOSED_KEY = "r_g_b-closed-sections";
+	const SECTIONS = ["kernel", "taps", "time", "start", "view", "pointer"] as const;
+	/** Which of the card's sections are open; the closed ones are kept in localStorage. */
+	let open = $state(Object.fromEntries(SECTIONS.map((name) => [name, !stored_closed().includes(name)])) as Record<(typeof SECTIONS)[number], boolean>);
+
+	/** The sections stored as closed; none when prerendering, or if storage fails. */
+	function stored_closed(): unknown[] {
+		try {
+			const stored: unknown = JSON.parse(storage?.getItem(CLOSED_KEY) ?? "[]");
+			return Array.isArray(stored) ? stored : [];
+		} catch {
+			return [];
+		}
+	}
+
+	$effect(() => {
+		const closed = SECTIONS.filter((name) => !open[name]);
+		try {
+			storage?.setItem(CLOSED_KEY, JSON.stringify(closed));
+		} catch {
+			// Not kept past this page, then.
+		}
+	});
 
 	let canvas: HTMLCanvasElement;
 	let chrome: HTMLElement;
@@ -465,8 +489,8 @@
 			</header>
 
 			<form onsubmit={(e) => e.preventDefault()}>
-				<fieldset>
-					<legend>Kernel</legend>
+				<details class="section" bind:open={open.kernel}>
+					<summary>Kernel</summary>
 					<div class="row">
 						<span>Kernel</span>
 						<select class="wide" value={source.kind === "seed" ? "random" : source.kind === "preset" ? source.name : "edited"} onchange={(e) => choose(e.currentTarget.value)}>
@@ -544,10 +568,10 @@
 						<input type="range" min="0" max={SLIDERS.drift.positions} value={position_of(SLIDERS.drift, settings.drift)} oninput={(e) => slide("drift", e)} />
 						<output>{settings.drift.toFixed(2)}×</output>
 					</label>
-				</fieldset>
+				</details>
 
-				<fieldset>
-					<legend>Taps</legend>
+				<details class="section" bind:open={open.taps}>
+					<summary>Taps</summary>
 					<label class="row">
 						<span>Spacing</span>
 						<input type="range" min="0" max={SLIDERS.spacing.positions} value={position_of(SLIDERS.spacing, settings.spacing)} oninput={(e) => slide("spacing", e)}
@@ -566,10 +590,10 @@
 							aria-valuetext="{(settings.persistence * 100).toFixed(1)}%" />
 						<output>{(settings.persistence * 100).toFixed(1)}%</output>
 					</label>
-				</fieldset>
+				</details>
 
-				<fieldset>
-					<legend>Time</legend>
+				<details class="section" bind:open={open.time}>
+					<summary>Time</summary>
 					<label class="row">
 						<span>Speed</span>
 						<input type="range" min="0" max={SLIDERS.speed.positions} value={position_of(SLIDERS.speed, settings.speed)} oninput={(e) => slide("speed", e)}
@@ -577,10 +601,10 @@
 						<output>{format_speed(settings.speed)}</output>
 					</label>
 					<p class="muted">Step {steps}.</p>
-				</fieldset>
+				</details>
 
-				<fieldset>
-					<legend>Start</legend>
+				<details class="section" bind:open={open.start}>
+					<summary>Start</summary>
 					<div class="row">
 						<span>Seeds</span>
 						<div class="choices">
@@ -610,19 +634,19 @@
 							<label><input type="checkbox" bind:checked={settings.float} /> Float buffers</label>
 						</div>
 					</div>
-				</fieldset>
+				</details>
 
-				<fieldset>
-					<legend>View</legend>
+				<details class="section" bind:open={open.view}>
+					<summary>View</summary>
 					<div class="choices">
 						{#each VIEWS as view (view)}
 							<label><input type="radio" name="view" bind:group={settings.view} value={view} /> {VIEW_LABELS[view]}</label>
 						{/each}
 					</div>
-				</fieldset>
+				</details>
 
-				<fieldset>
-					<legend>Pointer</legend>
+				<details class="section" bind:open={open.pointer}>
+					<summary>Pointer</summary>
 					<div class="row">
 						<span>Mouse</span>
 						<div class="choices">
@@ -665,7 +689,7 @@
 							<label><input type="checkbox" bind:checked={fade} /> Fade when the pointer is away</label>
 						</div>
 					</div>
-				</fieldset>
+				</details>
 			</form>
 
 			<footer class="actions">
@@ -750,14 +774,14 @@
 		border-radius: 0;
 	}
 
-	fieldset {
-		border: 0;
+	/* Sections fold away under their small uppercase titles. */
+	.section {
 		border-top: 1px solid var(--rule);
 		margin: 6px 0 0;
 		padding: 4px 0 2px;
 	}
-	legend {
-		padding: 0 8px 0 0;
+	summary {
+		cursor: pointer;
 		font-size: 11px;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
