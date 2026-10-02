@@ -74,7 +74,6 @@
 	let progress  = $state(0);
 	const encoded = $derived(encode(settings, name_of(source, base), settings.morph ? 0 : progress));
 	const PRESET_NAMES = Object.keys(PRESETS) as Preset[];
-	const SETTINGS_PRESET_NAMES = Object.keys(SETTINGS_PRESETS) as SettingsPreset[];
 
 	// Within NEAR px of the controls they're opaque; by FAR px away they've faded out.
 	const NEAR = 24;
@@ -510,7 +509,9 @@
 	/** The View section's lines: the picture and its channels, then what the last step did, from Change on. */
 	const VIEW_LINES = [VIEWS.slice(0, VIEWS.indexOf("change")), VIEWS.slice(VIEWS.indexOf("change"))];
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
+	/** The settings presets' labels, in the order of their buttons. */
 	const SETTINGS_PRESET_LABELS: Record<SettingsPreset, string> = { still: "No mouse", paint: "Paint", noise: "From noise", gray: "Black and white" };
+	const SETTINGS_PRESET_NAMES = Object.keys(SETTINGS_PRESET_LABELS) as SettingsPreset[];
 </script>
 
 <svelte:head>
@@ -544,7 +545,7 @@
 					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the Hinton Diagram's squares are their weights, hollow if negative and bronze past 1 either way. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat; to keep it so, when a square is dragged or typed in, the middle one takes up the difference.</p>
 					<p>“Tap” is a signal-processing term for one place a filter reads a sample and multiplies it by a weight. It comes from FIR filters built as a tapped delay line: a signal runs down a chain of delays, and each tap pulls off a copy and scales it. Here each tap is an offset from the pixel (x and y from −2 to 2, times Spacing) and a weight (its square in the diagram).</p>
 					<p>The Frequency Response map estimates what a step multiplies stripes' contrast by, for every stripe width and direction (flat in the middle, finer outward), before clipping: shaded where that's over 1, so they grow, and circled where fastest. A step can also shift stripes; half a cycle swaps bright and dark, and near that (hatched) they strobe.</p>
-					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them. The mouse moves either only while the kernel is random, so a preset or an edited kernel stays as it was chosen or made.</p>
+					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them. The mouse moves either only while the kernel is random, so a kernel preset or an edited kernel stays as it was chosen or made.</p>
 					<p>Taps are Spacing apart, rounded to whole pixels, so fine stripes can look like wider ones to them, and the map roughly repeats. Jitter gives each pixel its own fixed spacing, blurring the repeats and tending to favor the widest stripes.</p>
 					<p>A flat ground stays flat, so something has to break it: Noise, a restart from stripes clicked on the Frequency Response map, paint, or the seeds. By default the seeds are a red, a green and a blue dot in a line through the middle, at 1/6, 1/2 and 5/6 of the window's longer side. With stamping on, each step paints them back over its result, so they stay put and keep feeding what grows around them; with it off, they're only where things start, and change like any other pixel.</p>
 					<p>Each step's result is stored at the Bit Depth. At 8 bits every channel is rounded to one of 256 levels, so a change of less than half a level is lost: a blur slows as it spreads, then stops, leaving a soft trace of what it blurred. 16-bit and 32-bit floats round far more finely, so a blur gets much flatter before it stops (at 32, too flat to see), for more memory and time per step.</p>
