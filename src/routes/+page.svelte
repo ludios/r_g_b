@@ -520,6 +520,7 @@
 
 	{#if show_card}
 		<section class="card">
+			<p class="credit">The shader here is not my work or idea; it is <a href="https://vbuckenham.com/">v buckenham</a>'s amazing <a href="https://v21.io/r_g_b.html">r_g_b.html</a>, remixed here for educational purposes.</p>
 			<form novalidate onsubmit={(e) => e.preventDefault()}>
 				<details class="section" bind:open={open.time}>
 					<summary>Time</summary>
@@ -762,7 +763,7 @@
 					</select>
 				</label>
 			</footer>
-			<p class="credit">This is a clanked, refried, educational version of <a href="https://vbuckenham.com/">v buckenham</a>'s amazing <a href="https://v21.io/r_g_b.html">r_g_b.html</a>.</p>
+			<p class="credit">The shader here is not my work or idea; it's <a href="https://vbuckenham.com/">v buckenham</a>'s amazing <a href="https://v21.io/r_g_b.html">r_g_b.html</a>, remixed here for educational purposes.</p>
 		</section>
 	{/if}
 </div>
