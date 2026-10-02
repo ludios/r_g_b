@@ -502,7 +502,7 @@
 <div class="chrome" bind:this={chrome} style:opacity={fade ? opacity : 1}>
 	<div class="top">
 		<button type="button" onclick={() => (show_card = !show_card)}>{show_card ? "Hide controls" : "Show controls"}</button>
-		<button type="button" onclick={toggle_pause}>{paused ? "Play" : "Pause"}</button>
+		<button type="button" class="toggle" onclick={toggle_pause}><span class:off={!paused}>Play</span><span class:off={paused}>Pause</span></button>
 		<button type="button" onclick={step_once} disabled={!paused}>Step</button>
 		<button type="button" onclick={() => restart()}>Restart</button>
 	</div>
@@ -913,6 +913,17 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
+	}
+
+	/* A button whose labels share one cell, so it is as wide as the longest whichever is showing. */
+	.toggle {
+		display: inline-grid;
+	}
+	.toggle > span {
+		grid-area: 1 / 1;
+	}
+	.toggle > .off {
+		visibility: hidden;
 	}
 
 	.figures {
