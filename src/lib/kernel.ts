@@ -6,6 +6,9 @@ import { A } from "ayy";
 
 const log = getLogger(["r_g_b", "kernel"]);
 
+/** Kernels are numbered by the 32-bit seeds of their random draws. */
+export const MAX_SEED = 0xffffffff;
+
 /**
  * Row-major 5x5 weights summing to 1. Row 0 is sim.frag's y = -2, the bottom row on screen;
  * column 0 is x = -2, the left.
@@ -63,6 +66,31 @@ export function gen_kernel(random: () => number): Kernel {
 }
 
 /**
+ * A generator of uniform numbers in [0, 1), like Math.random, determined by `seed` (mulberry32).
+ * @param seed An integer from 0 to MAX_SEED.
+ */
+export function seeded_random(seed: number): () => number {
+	A.eq(seed >>> 0, seed);
+	let s = seed;
+	return () => {
+		s = (s + 0x6d2b79f5) | 0;
+		let t = Math.imul(s ^ (s >>> 15), 1 | s);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+}
+
+/** The random kernel numbered `seed`. */
+export function seeded_kernel(seed: number): Kernel {
+	return gen_kernel(seeded_random(seed));
+}
+
+/** The seed after `seed`, wrapping around to 0 past MAX_SEED. */
+export function next_seed(seed: number): number {
+	return (seed + 1) >>> 0;
+}
+
+/**
  * Scales each weight's deviation from flat by `gain`, keeping the sum at 1. More deviation
  * amplifies more frequencies, more strongly; at 0 the kernel is flat and the pattern dissolves.
  */
@@ -76,19 +104,24 @@ function ease_in_out_sine(x: number): number {
 }
 
 /**
- * The kernel morphing through random kernels one simulation step at a time, so pausing holds it:
- * each crossfades into the next, easing in and out.
+ * The kernel morphing through the random kernels in seed order, one simulation step at a time,
+ * so pausing holds it: each crossfades into the next, easing in and out.
  */
 export class KernelMorph {
-	#from: Kernel;
-	#to: Kernel;
+	#seed = 0;
+	#from: Kernel = [];
+	#to: Kernel = [];
 	/** How far the crossfade has gone, from 0 up to 1. */
 	#progress = 0;
 
-	/** @param random Uniform on [0, 1), like Math.random. */
-	constructor(private random: () => number) {
-		this.#from = this.#generate();
-		this.#to = this.#generate();
+	/** @param seed The kernel to start from, fading toward the next. */
+	constructor(seed: number) {
+		this.jump(seed);
+	}
+
+	/** The seed of the kernel the crossfade started from; it's fading toward the next seed's. */
+	get seed(): number {
+		return this.#seed;
 	}
 
 	/** How far the crossfade has gone, from 0 up to 1. */
@@ -102,11 +135,13 @@ export class KernelMorph {
 		return this.#to.map((k, i) => k * t + this.#from[i]! * (1 - t));
 	}
 
-	/** Jumps to a random kernel, fading toward another. */
-	jump(): void {
-		this.#from = this.#generate();
-		this.#to = this.#generate();
+	/** Jumps to the kernel numbered `seed`, fading toward the next. */
+	jump(seed: number): void {
+		this.#seed = seed;
+		this.#from = seeded_kernel(seed);
+		this.#to = seeded_kernel(next_seed(seed));
 		this.#progress = 0;
+		log.info("kernel {seed}", { seed });
 	}
 
 	/**
@@ -118,15 +153,11 @@ export class KernelMorph {
 		this.#progress += 1 / steps;
 		// Ten tenths add up to just under 1.
 		if (this.#progress > 1 - 1e-9) {
+			this.#seed = next_seed(this.#seed);
 			this.#from = this.#to;
-			this.#to = this.#generate();
+			this.#to = seeded_kernel(next_seed(this.#seed));
 			this.#progress = 0;
+			log.info("kernel {seed}", { seed: this.#seed });
 		}
-	}
-
-	#generate(): Kernel {
-		const kernel = gen_kernel(this.random);
-		log.info("new kernel {kernel}", { kernel: JSON.stringify(kernel) });
-		return kernel;
 	}
 }

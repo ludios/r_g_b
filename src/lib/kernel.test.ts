@@ -1,7 +1,7 @@
 // Model-output: Claude Opus 5.5
 import { array, assert, double, property } from "fast-check";
 import { describe, expect, test } from "vitest";
-import { FLAT, KernelMorph, TAPS, gen_kernel, with_contrast } from "./kernel";
+import { FLAT, KernelMorph, MAX_SEED, TAPS, gen_kernel, next_seed, seeded_kernel, with_contrast } from "./kernel";
 
 /** Uniform draws in [0, 1), as many as a kernel takes: two per tap and one for the smoothing. */
 const draws = array(double({ min: 0, max: 1, maxExcluded: true, noNaN: true }), { minLength: 2 * TAPS + 1, maxLength: 2 * TAPS + 1 });
@@ -48,24 +48,30 @@ describe("with_contrast", () => {
 	});
 });
 
+describe("seeded_kernel", () => {
+	test("is the same kernel for the same seed, and another for the next", () => {
+		expect(seeded_kernel(4711)).toEqual(seeded_kernel(4711));
+		expect(seeded_kernel(4712)).not.toEqual(seeded_kernel(4711));
+		expect(next_seed(MAX_SEED)).toBe(0);
+	});
+});
+
 describe("KernelMorph", () => {
-	test("starts at one kernel, ends at the next after the given steps, and moves on from there", () => {
-		const morph = new KernelMorph(Math.random);
-		const first = morph.kernel;
+	test("starts at one seed's kernel, ends at the next seed's after the given steps, and moves on", () => {
+		const morph = new KernelMorph(MAX_SEED);
+		expect(morph.kernel).toEqual(seeded_kernel(MAX_SEED));
 		for (let i = 0; i < 5; i++) {
 			morph.advance(10);
 		}
 		expect(morph.progress).toBeCloseTo(0.5, 12);
 		expect(sum(morph.kernel)).toBeCloseTo(1, 12);
-		expect(morph.kernel).not.toEqual(first);
 		for (let i = 0; i < 5; i++) {
 			morph.advance(10);
 		}
 		expect(morph.progress).toBe(0);
-		const second = morph.kernel;
-		morph.advance(2);
-		expect(morph.kernel).not.toEqual(second);
-		morph.jump();
-		expect(morph.progress).toBe(0);
+		expect(morph.seed).toBe(0);
+		expect(morph.kernel).toEqual(seeded_kernel(0));
+		morph.jump(42);
+		expect(morph.kernel).toEqual(seeded_kernel(42));
 	});
 });

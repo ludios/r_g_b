@@ -49,11 +49,13 @@ export interface Slider {
 	scale: "linear" | "log";
 	/** The input's max; its min is 0 and its step 1. */
 	positions: number;
+	/** Whether values are whole numbers. */
+	integer?: boolean;
 }
 
 export const SLIDERS = {
 	contrast:    { min: 0,      max: 4,     scale: "linear", positions: 200 },
-	morph_steps: { min: 60,     max: 36000, scale: "log",    positions: 120 },
+	morph_steps: { min: 60,     max: 36000, scale: "log",    positions: 120, integer: true },
 	spacing:     { min: 1,      max: 256,   scale: "log",    positions: 240 },
 	jitter:      { min: 0,      max: 0.25,  scale: "linear", positions: 100 },
 	persistence: { min: 0,      max: 1,     scale: "linear", positions: 400 },
@@ -62,14 +64,15 @@ export const SLIDERS = {
 } as const satisfies Record<string, Slider>;
 
 /**
- * The value at a slider position, to four significant digits so that it reads back as typed.
+ * The value at a slider position, whole or to four significant digits, so that it reads back
+ * as shown.
  * @param position 0 to `s.positions`; anything past an end is that end.
  */
 export function value_at(s: Slider, position: number): number {
 	A.lt(s.min, s.max);
 	const t = Math.min(1, Math.max(0, position / s.positions));
 	const value = s.scale === "linear" ? s.min + t * (s.max - s.min) : s.min * Math.pow(s.max / s.min, t);
-	return Number(value.toPrecision(4));
+	return s.integer ? Math.round(value) : Number(value.toPrecision(4));
 }
 
 /** The nearest slider position to `value`; anything past an end sits at that end. */

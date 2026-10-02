@@ -1,7 +1,9 @@
 <!-- Model-output: Claude Opus 5.5 -->
 <script lang="ts">
 	import { onMount } from "svelte";
-	import { KernelMorph, with_contrast } from "$lib/kernel";
+	import { replaceState } from "$app/navigation";
+	import { decode, encode } from "$lib/codec";
+	import { KernelMorph, MAX_SEED, next_seed, with_contrast } from "$lib/kernel";
 	import { DEFAULT_SETTINGS, PARAMS, type Param, SLIDERS, type Settings, type Slider, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { local_storage } from "$lib/storage";
@@ -20,11 +22,24 @@
 	let canvas: HTMLCanvasElement;
 	let chrome: HTMLElement;
 	let sim: Simulation | undefined;
-	const morph = new KernelMorph(Math.random);
+	// The page is prerendered with some kernel; the URL's, or a random one, takes over once mounted.
+	const morph = new KernelMorph(0);
+	/** The morph's seed, as reactive state. */
+	let seed    = $state(0);
+	const encoded = $derived(encode(settings, seed));
 
 	// Within NEAR px of the controls they're opaque; by FAR px away they've faded out.
 	const NEAR = 24;
 	const FAR  = 240;
+
+	// The address bar follows along, so a URL reproduces the settings and the kernel. Debounced:
+	// Safari refuses more than 100 replaceState calls in 30 seconds, and a slider makes many.
+	$effect(() => {
+		const url  = new URL(location.href);
+		url.search = encoded;
+		const timer = setTimeout(() => replaceState(url, {}), 300);
+		return () => clearTimeout(timer);
+	});
 
 	$effect(() => {
 		if (theme.theme === "system") {
@@ -51,12 +66,38 @@
 		steps++;
 	}
 
+	/** Jumps to the kernel numbered `to`, wrapping around past either end. */
+	function jump(to: number): void {
+		morph.jump(to >>> 0);
+		seed = morph.seed;
+	}
+
+	function new_kernel(): void {
+		jump(Math.floor(Math.random() * 1_000_000));
+	}
+
+	/** Takes a typed seed once the user is done with it, rather than every half-typed number. */
+	function commit_seed(event: Event & { currentTarget: HTMLInputElement }): void {
+		const typed = event.currentTarget.valueAsNumber;
+		if (Number.isInteger(typed) && typed >= 0 && typed <= MAX_SEED) {
+			jump(typed);
+		}
+		event.currentTarget.value = String(seed);
+	}
+
 	function step_once(): void {
 		step();
 		sim!.draw();
 	}
 
 	onMount(() => {
+		const decoded = decode(location.search);
+		settings = decoded.settings;
+		if (decoded.seed === null) {
+			new_kernel();
+		} else {
+			jump(decoded.seed);
+		}
 		sim = new Simulation(canvas);
 		restart();
 		// A lost WebGL context loses the buffers (and three.js's clear color), so it restarts.
@@ -74,6 +115,7 @@
 				}
 			}
 			frame++;
+			seed    = morph.seed;
 			next_in = Math.ceil((1 - morph.progress) * settings.morph_steps);
 			sim!.draw();
 		}
@@ -156,7 +198,7 @@
 
 <svelte:window onpointermove={on_pointer_move} onmouseout={on_mouse_out} onkeydown={on_key} onresize={restart} />
 
-<canvas bind:this={canvas} onclick={() => morph.jump()}></canvas>
+<canvas bind:this={canvas} onclick={new_kernel}></canvas>
 
 <div class="chrome" bind:this={chrome} style:opacity={fade ? opacity : 1}>
 	<button type="button" class="toggle" onclick={() => (show_card = !show_card)}>{show_card ? "Hide controls" : "Show controls"}</button>
@@ -167,12 +209,21 @@
 				<button type="button" onclick={toggle_pause}>{paused ? "Play" : "Pause"}</button>
 				<button type="button" onclick={step_once} disabled={!paused}>Step</button>
 				<button type="button" onclick={restart}>Restart</button>
-				<button type="button" onclick={() => morph.jump()}>New kernel</button>
+				<button type="button" onclick={new_kernel}>New kernel</button>
 			</header>
 
 			<form onsubmit={(e) => e.preventDefault()}>
 				<fieldset>
 					<legend>Kernel</legend>
+					<div class="row">
+						<span>Number</span>
+						<div class="seed">
+							<button type="button" onclick={() => jump(seed - 1)} aria-label="Previous kernel">‹</button>
+							<input type="number" min="0" max={MAX_SEED} step="1" value={seed} onchange={commit_seed} aria-label="Kernel number" />
+							<button type="button" onclick={() => jump(seed + 1)} aria-label="Next kernel">›</button>
+						</div>
+						<output>{settings.morph ? `to ${next_seed(seed)}` : ""}</output>
+					</div>
 					<label class="row">
 						<span>Contrast</span>
 						<input type="range" min="0" max={SLIDERS.contrast.positions} value={position_of(SLIDERS.contrast, settings.contrast)} oninput={(e) => slide("contrast", e)} />
@@ -390,6 +441,22 @@
 	}
 	input[type="checkbox"] {
 		margin: 0;
+	}
+
+	.seed {
+		display: flex;
+		gap: 4px;
+	}
+	.seed input {
+		flex: 1;
+		min-width: 0;
+		padding: 1px 6px;
+		background: var(--card);
+		border: 1px solid var(--rule-strong);
+		font-variant-numeric: tabular-nums;
+	}
+	.seed button {
+		padding: 0 8px;
 	}
 
 	/* Sliders are a bar with a thin thumb. */

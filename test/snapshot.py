@@ -1,43 +1,35 @@
 #!/usr/bin/env python3
 """Deterministic screenshots of the page, for checking that a refactor doesn't change the output.
 
-    test/snapshot.py SOURCE OUTDIR [--frames N] [--seed S]
+    test/snapshot.py SOURCE OUTDIR [--frames N]
     test/snapshot.py --diff DIR1 DIR2
 
 SOURCE is the project's directory (normally .), or a git revision of the current repository. Either
 is copied to a scratch tree (a directory's tracked and untracked-but-not-ignored files; a revision's
-tree from git) and built there, unminified, with SOURCE's node_modules (for a revision, the working
-tree's, so both sides of a dependency bump would build with the same versions): a SvelteKit project
-into build/index.html, a Vite one into dist/r_g_b.html; older trees' r_g_b.html is used as it is.
+tree from git) and built there with SOURCE's node_modules (for a revision, the working tree's, so
+both sides of a dependency bump build with the same versions).
 
-For each of a few mouse positions, headless Chrome (SwiftShader WebGL2) loads the page from a local
-http server. Once the page has asked for an animation frame, it renders N more frames by calling the
-captured requestAnimationFrame callback, and posts the screen back, saved as OUTDIR/mouse-X-Y.png.
-
-Math.random is seeded, with separate streams for three.js's generateUUID and for everything else,
-so kernels don't depend on how many objects three.js creates; a page whose generateUUID can't be
-found is an error. The mouse is placed by calling the mousemove listener as soon as it's added.
-Date.now() and performance.now() start frozen and advance 500 ms per frame, so 150 frames cross the
-60 s kernel swap.
+For each query string in QUERIES (settings and a kernel number), headless Chrome (SwiftShader
+WebGL2) loads the page from a local http server. Once the page has asked for an animation frame,
+the harness calls the captured requestAnimationFrame callback N more times and saves the screen to
+OUTDIR/<query>.png. Math.random is seeded, and Date.now() and performance.now() start frozen and
+advance 500 ms per frame.
 
 Example: test/snapshot.py HEAD /tmp/a && test/snapshot.py . /tmp/b && test/snapshot.py --diff /tmp/a /tmp/b
 """
-import argparse, base64, concurrent.futures, functools, http.server, json, os, re, shutil, signal, struct, subprocess, sys, tempfile, threading, zlib
+import argparse, base64, concurrent.futures, functools, http.server, json, os, shutil, signal, struct, subprocess, sys, tempfile, threading, zlib
 
-MICE = [(0.5, 0.5), (0.9, 0.3), (0.15, 0.75), (0.6, 0.97)]
+QUERIES = ["k=1", "k=2&c=3.5&s=4", "k=3&s=40&p=0.5&ms=60", "k=4&c=1.2&s=2&j=0"]
 
 PRE = """<script>
 (() => {
-    const mulberry32 = s => () => {
+    let s = 1;
+    Math.random = () => {  // mulberry32
         s = s + 0x6D2B79F5 | 0;
         let t = Math.imul(s ^ s >>> 15, 1 | s);
         t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
-    const pageRandom = mulberry32(%(seed)d), libraryRandom = mulberry32(~%(seed)d);
-    // Stack line 2 is Math.random's caller.
-    window.__libraryCalls = 0;
-    Math.random = () => new Error().stack.split("\\n")[2].includes(" at generateUUID") ? (__libraryCalls++, libraryRandom()) : pageRandom();
     window.__elapsed = 0;
     Date.now = () => 1e12 + __elapsed;
     performance.now = () => 1000 + __elapsed;
@@ -50,21 +42,13 @@ PRE = """<script>
         console[level] = (...args) => { __errors.push(level + ": " + args.join(" ")); orig(...args); };
     }
     window.addEventListener("error", e => __errors.push("uncaught: " + e.message));
-    const addEventListener = window.addEventListener;
-    window.addEventListener = function (type, listener, options) {
-        addEventListener.call(this, type, listener, options);
-        if (type === "mousemove") {
-            const x = %(mouseX)s * innerWidth, y = %(mouseY)s * innerHeight;
-            listener({ pageX: x, pageY: y, clientX: x, clientY: y });
-        }
-    };
 })();
 </script>
 """
 
 POST = """<script>
-// The page may start asynchronously (SvelteKit imports its bundle), so this waits for its first
-// requestAnimationFrame.
+// SvelteKit starts asynchronously, once its bundle is imported, so this waits for the page's
+// first requestAnimationFrame.
 (function run(polls) {
     if (!__frame && polls < 3000) {
         setTimeout(run, 10, polls + 1);
@@ -80,9 +64,6 @@ POST = """<script>
             const cb = __frame;
             __frame = null;
             cb(performance.now());
-        }
-        if (!__libraryCalls) {
-            __errors.push("harness: no Math.random calls from generateUUID; is three.js minified?");
         }
         const gl = [...document.querySelectorAll("canvas")].map(c => c.getContext("webgl2")).find(Boolean);
         const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
@@ -125,7 +106,7 @@ def read_png(path):
 
 
 def build(source, tmp):
-    """Copies SOURCE to a scratch tree under tmp and builds it; returns (directory to serve, page)."""
+    """Copies SOURCE to a scratch tree under tmp, builds it, and returns the directory to serve."""
     tree = os.path.join(tmp, "tree")
     os.mkdir(tree)
     if os.path.isdir(source):
@@ -141,17 +122,10 @@ def build(source, tmp):
                              check=True).stdout.strip()
         archive = subprocess.run(["git", "-C", top, "archive", source], capture_output=True, check=True).stdout
         subprocess.run(["tar", "-x", "-C", tree], input=archive, check=True)
-    if os.path.exists(os.path.join(top, "node_modules")):
-        os.symlink(os.path.abspath(os.path.join(top, "node_modules")), os.path.join(tree, "node_modules"))
-    # Unminified, so that PRE can find generateUUID in stacks.
-    vite = [os.path.join(tree, "node_modules/.bin/vite"), "build", "--logLevel", "error", "--minify", "false"]
-    if os.path.exists(os.path.join(tree, "svelte.config.js")):
-        subprocess.run(vite, cwd=tree, check=True, stdout=subprocess.DEVNULL)  # The adapter chats there
-        return os.path.join(tree, "build"), "index.html"
-    if os.path.exists(os.path.join(tree, "vite.config.ts")):
-        subprocess.run(vite + ["--outDir", "dist", "--emptyOutDir"], cwd=tree, check=True)
-        return os.path.join(tree, "dist"), "r_g_b.html"
-    return tree, "r_g_b.html"
+    os.symlink(os.path.abspath(os.path.join(top, "node_modules")), os.path.join(tree, "node_modules"))
+    subprocess.run([os.path.join(tree, "node_modules/.bin/vite"), "build", "--logLevel", "error"], cwd=tree,
+                   check=True, stdout=subprocess.DEVNULL)  # The adapter chats on stdout
+    return os.path.join(tree, "build")
 
 
 class Server(http.server.ThreadingHTTPServer):
@@ -182,26 +156,25 @@ class Server(http.server.ThreadingHTTPServer):
             return self.results.get(index, {"errors": ["harness: no result in %d s" % timeout]})
 
 
-def snapshot(server, served, page, index, outdir, mouse, frames, seed):
-    """Loads a copy of the page at /<index>/ with the mouse at `mouse`; returns (file name, w, h, errors)."""
-    pre = PRE % {"seed": seed, "mouseX": mouse[0], "mouseY": mouse[1]}
+def snapshot(server, served, index, outdir, query, frames):
+    """Loads a copy of the page at /<index>/?<query>; returns (file name, w, h, errors)."""
     shutil.copytree(served, os.path.join(server.directory, str(index)))
-    path = os.path.join(server.directory, str(index), page)
-    src = open(path).read().replace("<head>", "<head>\n" + pre, 1)
+    path = os.path.join(server.directory, str(index), "index.html")
+    src = open(path).read().replace("<head>", "<head>\n" + PRE, 1)
     end = src.rindex("</body>")
     open(path, "w").write(src[:end] + POST % {"frames": frames, "index": index} + src[end:])
     with tempfile.TemporaryDirectory() as profile:
         chrome = subprocess.Popen(["google-chrome", "--headless=new", "--use-angle=swiftshader",
                                    "--enable-unsafe-swiftshader", "--window-size=640,480", "--no-first-run",
                                    f"--user-data-dir={profile}",
-                                   f"http://127.0.0.1:{server.server_port}/{index}/{page}"],
+                                   f"http://127.0.0.1:{server.server_port}/{index}/?{query}"],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         try:
             res = server.wait_for(index, 600)
         finally:
             os.killpg(chrome.pid, signal.SIGTERM)
             chrome.wait()
-    name = "mouse-%.2f-%.2f.png" % mouse
+    name = query.replace("&", ",") + ".png"
     if "px" in res:
         write_png(os.path.join(outdir, name), res["w"], res["h"], base64.b64decode(res["px"]))
     return name, res.get("w"), res.get("h"), res["errors"]
@@ -230,7 +203,6 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--diff", action="store_true")
     ap.add_argument("--frames", type=int, default=150)
-    ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("a")
     ap.add_argument("b")
     args = ap.parse_args()
@@ -239,16 +211,16 @@ def main():
 
     os.makedirs(args.b, exist_ok=True)
     for name in os.listdir(args.b):
-        if re.fullmatch(r"mouse-.*\.png", name):
+        if name.endswith(".png"):
             os.remove(os.path.join(args.b, name))
     with tempfile.TemporaryDirectory() as tmp:
-        served, page = build(args.a, tmp)
+        served = build(args.a, tmp)
         os.mkdir(os.path.join(tmp, "www"))
         server = Server(os.path.join(tmp, "www"))
         threading.Thread(target=server.serve_forever, daemon=True).start()
         with concurrent.futures.ThreadPoolExecutor() as pool:
-            results = list(pool.map(lambda im: snapshot(server, served, page, im[0], args.b, im[1], args.frames, args.seed),
-                                    enumerate(MICE)))
+            results = list(pool.map(lambda iq: snapshot(server, served, iq[0], args.b, iq[1], args.frames),
+                                    enumerate(QUERIES)))
         server.shutdown()
     for name, w, h, errors in results:
         print(f"{name}: {w}x{h}" + "".join(f"\n  {e}" for e in errors))
