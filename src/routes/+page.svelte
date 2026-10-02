@@ -915,9 +915,11 @@
 		gap: 6px;
 	}
 
-	/* A button whose labels share one cell, so it is as wide as the longest whichever is showing. */
+	/* A button with two labels in one cell, the one not showing hidden but still laid out, so
+	   it is as wide as the longer label either way. Centered as a button's label would be. */
 	.toggle {
 		display: inline-grid;
+		align-items: center;
 	}
 	.toggle > span {
 		grid-area: 1 / 1;
