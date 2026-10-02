@@ -1,8 +1,8 @@
 <!-- Model-output: Claude Opus 5.5 -->
 <script lang="ts">
-	// Where one pixel's taps land on screen, each marked like the kernel diagram's squares: filled
-	// if its weight is positive, hollow if negative, by area. Taps past an edge wrap around, as the
-	// step's do. Jitter, different at every pixel, isn't shown.
+	// Where one pixel's taps land on screen, each marked with a square: filled if its weight is
+	// positive, hollow if negative, by area up to a weight of 1. Taps past an edge wrap around, as
+	// the step's do. Jitter, different at every pixel, isn't shown.
 	import { type Kernel, MIDDLE, TAPS, tap_offset, tap_pixels } from "./kernel";
 
 	interface Props {
