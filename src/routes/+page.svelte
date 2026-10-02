@@ -481,35 +481,36 @@
 {/if}
 
 <div class="chrome" bind:this={chrome} style:opacity={fade ? opacity : 1}>
-	<button type="button" class="toggle" onclick={() => (show_card = !show_card)}>{show_card ? "Hide controls" : "Show controls"}</button>
+	<div class="top">
+		<button type="button" onclick={() => (show_card = !show_card)}>{show_card ? "Hide controls" : "Show controls"}</button>
+		<button type="button" onclick={toggle_pause}>{paused ? "Play" : "Pause"}</button>
+		<button type="button" onclick={step_once} disabled={!paused}>Step</button>
+		<button type="button" onclick={() => restart()}>Restart</button>
+	</div>
 
 	{#if show_card}
 		<section class="card">
-			<header class="actions">
-				<button type="button" onclick={toggle_pause}>{paused ? "Play" : "Pause"}</button>
-				<button type="button" onclick={step_once} disabled={!paused}>Step</button>
-				<button type="button" onclick={() => restart()}>Restart</button>
-				<button type="button" onclick={new_kernel}>New kernel</button>
-			</header>
-
 			<form onsubmit={(e) => e.preventDefault()}>
 				<details class="section" bind:open={open.kernel}>
 					<summary>Kernel</summary>
 					<div class="row">
 						<span>Kernel</span>
-						<select class="wide" value={source.kind === "seed" ? "random" : source.kind === "preset" ? source.name : "edited"} onchange={(e) => choose(e.currentTarget.value)}>
-							<option value="random">Random</option>
-							{#each PRESET_GROUPS as [label, names] (label)}
-								<optgroup label={label}>
-									{#each names as name (name)}
-										<option value={name}>{PRESET_LABELS[name]}</option>
-									{/each}
-								</optgroup>
-							{/each}
-							{#if source.kind === "edited"}
-								<option value="edited" disabled>Edited</option>
-							{/if}
-						</select>
+						<div class="wide pick">
+							<select value={source.kind === "seed" ? "random" : source.kind === "preset" ? source.name : "edited"} onchange={(e) => choose(e.currentTarget.value)}>
+								<option value="random">Random</option>
+								{#each PRESET_GROUPS as [label, names] (label)}
+									<optgroup label={label}>
+										{#each names as name (name)}
+											<option value={name}>{PRESET_LABELS[name]}</option>
+										{/each}
+									</optgroup>
+								{/each}
+								{#if source.kind === "edited"}
+									<option value="edited" disabled>Edited</option>
+								{/if}
+							</select>
+							<button type="button" onclick={new_kernel}>Randomize</button>
+						</div>
 					</div>
 					{#if source.kind === "seed"}
 						<div class="row">
@@ -816,6 +817,10 @@
 		margin: 6px 0 0;
 		padding: 4px 0 2px;
 	}
+	form > .section:first-child {
+		border-top: 0;
+		margin-top: 0;
+	}
 	summary {
 		cursor: pointer;
 		font-size: 11px;
@@ -873,6 +878,22 @@
 	.wide {
 		grid-column: 2 / -1;
 		min-width: 0;
+	}
+	/* The kernel select, and Randomize beside it. */
+	.pick {
+		display: flex;
+		gap: 6px;
+	}
+	.pick select {
+		flex: 1;
+		min-width: 0;
+	}
+
+	/* Above the card, and still there when it's hidden. */
+	.top {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
 	}
 
 	.figures {
