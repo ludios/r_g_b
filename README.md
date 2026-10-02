@@ -1,4 +1,5 @@
-<!-- Model-output: Claude Opus 5.5 -->
+(LLM-authored slop README)
+
 # r_g_b
 
 A WebGL feedback loop that grows stripes from three dots, after v buckenham's
