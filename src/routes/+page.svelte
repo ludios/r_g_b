@@ -840,6 +840,7 @@
 		background: var(--card);
 		padding: 8px 16px 12px;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 0.15), 0 8px 24px rgb(0 0 0 / 0.08);
+		font-size: 12px;
 	}
 
 	/* Three lines, whatever the map says, so the controls under it stay put. */
@@ -848,7 +849,6 @@
 	}
 
 	.prose {
-		font-size: 12px;
 		line-height: 1.45;
 	}
 	.prose p {
@@ -872,18 +872,15 @@
 
 	.credit {
 		margin: 8px 0 0;
-		font-size: 12px;
 		color: var(--text-muted);
 	}
 
 	.muted {
 		color: var(--text-muted);
-		font-size: 12px;
 		margin: 2px 0 4px;
 	}
 
 	select {
-		font-size: 12px;
 		padding: 1px 2px;
 		background: var(--card);
 		border: 1px solid var(--rule-strong);
@@ -906,13 +903,10 @@
 
 	.row {
 		display: grid;
-		grid-template-columns: 6.5em minmax(0, 1fr) 6.5em;
+		grid-template-columns: 7.5em minmax(0, 1fr) 7.5em;
 		gap: 10px;
 		align-items: center;
 		margin: 4px 0;
-	}
-	.row > :first-child, .row > .check {
-		font-size: 12px;
 	}
 	/* A row of choices has no readout, so it runs to the edge. */
 	.row > .choices {
@@ -923,7 +917,6 @@
 		align-items: baseline;
 	}
 	.row output {
-		font-size: 12px;
 		font-variant-numeric: tabular-nums;
 		color: var(--text-muted);
 		text-align: right;
@@ -945,7 +938,6 @@
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 4px 12px;
-		font-size: 12px;
 	}
 	/* Choices that share their line in halves, whatever their longest option; a select too long for
 	   its half is cut off until it's opened. They wrap only when a half couldn't show a short one. */
@@ -1025,7 +1017,6 @@
 	}
 	.tools button, .presets button, .pick button, .readout button {
 		padding: 0 7px;
-		font-size: 12px;
 	}
 	.tools button, .presets button, .pick button {
 		line-height: 20px;
@@ -1043,9 +1034,11 @@
 		line-height: 16px;
 	}
 
+	/* The kernel number and its ‹ › stay as large as the text outside the card. */
 	.seed {
 		display: flex;
 		gap: 4px;
+		font-size: 14px;
 	}
 	.seed input {
 		flex: 1;
