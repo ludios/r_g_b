@@ -417,7 +417,7 @@
 	function follow(target: MouseTarget | null, along: number, axis: "x" | "y"): void {
 		if (target === "r_g_b" && axis === "x") {
 			settings.contrast = Number((0.8 + 3 * along).toPrecision(4));
-		} else if (target === "r_g_b") {
+		} else if (target === "r_g_b" || target === "spacing_persistence") {
 			// r_g_b.html's easeInExpo, and its spacing of up to a third of the height.
 			const e = along === 0 ? 0 : Math.pow(2, 10 * along - 10);
 			const spacing = (e * window.innerHeight) / settings.pixel / 3;
@@ -464,7 +464,8 @@
 		return speed >= 1 ? `${speed} per frame` : `1 per ${Math.round(1 / speed)} frames`;
 	}
 
-	const MOUSE_LABELS:  Record<MouseTarget, string> = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence", r_g_b: "As r_g_b.html" };
+	const MOUSE_LABELS:  Record<MouseTarget, string> = { contrast: "Contrast", drift: "Drift", spacing: "Spacing", jitter: "Jitter", persistence: "Persistence",
+		spacing_persistence: "Spacing + persistence", r_g_b: "As r_g_b.html" };
 	const CLICK_LABELS:  Record<Click, string>  = { kernel: "New kernel", paint: "Paint", erase: "Erase", taps: "Show taps" };
 	const PRESET_LABELS: Record<Preset, string> = {
 		identity: "Identity", box: "Box blur", shift: "Shift", lean: "Lean", skip: "Every other tap",

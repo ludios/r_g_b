@@ -9,14 +9,14 @@ export type Param = "contrast" | "drift" | "spacing" | "jitter" | "persistence";
 export const PARAMS: readonly Param[] = ["contrast", "drift", "spacing", "jitter", "persistence"];
 
 /**
- * What the mouse can be given: a slider, or what r_g_b.html gave it. That was contrast from 0.8 to
- * 3.8 on mouse X, and on mouse Y spacing and persistence together, both exponential in the
- * pointer's place: 0 at the top, 1/32 of the way at the middle, all the way at the bottom, where
- * persistence 1 freezes the image.
+ * What the mouse can be given: a slider; spacing and persistence together, as r_g_b.html's mouse Y
+ * set them, both exponential in the pointer's place (0 at the top or left, 1/32 of the way in the
+ * middle, all the way at the far end, where persistence 1 freezes the image); or whatever
+ * r_g_b.html gave that axis, which on X was contrast from 0.8 to 3.8.
  */
-export type MouseTarget = Param | "r_g_b";
+export type MouseTarget = Param | "spacing_persistence" | "r_g_b";
 
-export const MOUSE_TARGETS: readonly MouseTarget[] = [...PARAMS, "r_g_b"];
+export const MOUSE_TARGETS: readonly MouseTarget[] = [...PARAMS, "spacing_persistence", "r_g_b"];
 
 /** What a click or tap on the image does; painting and erasing also drag. */
 export const CLICKS = ["kernel", "paint", "erase", "taps"] as const;
