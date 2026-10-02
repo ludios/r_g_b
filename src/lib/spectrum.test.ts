@@ -173,4 +173,13 @@ describe("presets", () => {
 			expect(fastest_along(PRESETS.hexagons, degrees)).toBeLessThan(1.41);
 		}
 	});
+
+	test("rise grows stripes as the row does, whatever their slant, and moves everything up a tap a step", () => {
+		const model = { kernel: PRESETS.rise, spacing: 1, jitter: 0, persistence: 0 };
+		for (const fy of [-0.3, 0, 0.1, 0.25]) {
+			expect(multiplier(model, 1 / 6, fy).growth).toBeCloseTo(1.25, 12);
+			// cos(2 pi fy y - 2 pi fy) is the level stripes cos(2 pi fy y) a tap higher.
+			expect(multiplier(model, 0, fy).phase).toBeCloseTo(-2 * Math.PI * fy, 12);
+		}
+	});
 });

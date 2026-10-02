@@ -78,6 +78,11 @@ export const PRESETS = {
 	checker:  kernel_of((x, y) => (x === 0 && y === 0 ? -0.5 : Math.abs(x) + Math.abs(y) === 1 ? 0.375 : 0)),
 	/** Identity plus a lopsided pair: stripes 4 taps apart grow as they slide. Drift 0 is the identity. */
 	advect:   kernel_of((x, y) => (y === 0 ? [0, -0.5, 1, 0.5, 0][x + 2]! : 0)),
+	/**
+	 * The row a tap lower: everything rises a tap a step as stripes 6 taps apart grow across it, so
+	 * a seed stamped every step trails a V-shaped plume.
+	 */
+	rise:     kernel_of((x, y) => (y === -1 ? [-0.25, 0.5, 0.5, 0.5, -0.25][x + 2]! : 0)),
 } satisfies Record<string, Kernel>;
 
 export type Preset = keyof typeof PRESETS;
