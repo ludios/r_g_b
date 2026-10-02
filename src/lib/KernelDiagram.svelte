@@ -1,12 +1,11 @@
 <!-- Model-output: Claude Opus 5.5 -->
 <script lang="ts">
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
-	// screen, whose area is the weight's size, filled if positive and hollow if negative. Past 1
-	// either way, the square fills its cell to the edge, in the accent color. Dragging a square up
-	// or down changes its weight, and clicking one, or choosing it with the arrow keys, gives a
-	// field to type it in; the taps that change with it are outlined, it more heavily. The middle
-	// tap, outlined with dashes, is whatever makes the sum 1, so it follows the others rather than
-	// being edited itself.
+	// screen, whose area is the weight's size, filled if positive and hollow if negative, and past 1
+	// either way, in the accent color. Dragging a square up or down changes its weight, and clicking
+	// one, or choosing it with the arrow keys, gives a field to type it in; the taps that change
+	// with it are outlined, it more heavily. The middle tap, outlined with dashes, is whatever makes
+	// the sum 1, so it follows the others rather than being edited itself.
 	import { tick } from "svelte";
 	import { type Group, type Kernel, MIDDLE, TAPS, group_of, neighbor_tap, reweighted, tap_offset } from "./kernel";
 
@@ -75,15 +74,9 @@
 		return Math.abs(Number(format(weight))) > 1;
 	}
 
-	/**
-	 * A square's side: by area, up to most of the cell at 1, which leaves a gap to the cell's edge;
-	 * past that, the whole cell, less a hollow square's stroke so that it stays inside.
-	 */
+	/** A square's side: by area, up to most of the cell at 1, leaving a gap to the cell's edge. */
 	function side(weight: number): number {
-		if (!over(weight)) {
-			return CELL * 0.9 * Math.sqrt(Math.abs(weight));
-		}
-		return weight < 0 ? CELL - 1.5 : CELL;
+		return CELL * 0.9 * Math.sqrt(Math.min(1, Math.abs(weight)));
 	}
 
 	/** Where tap `i` reads from, in taps from the pixel itself; up is +y. */
@@ -261,9 +254,13 @@
 				<rect class="weight" class:negative={w < 0} class:over={over(w)} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
 			</g>
 		{/each}
+		<!-- Each inside its own cell, so no neighbor's covers it; a path length of 100 puts the middle's
+		     dashes the same at every corner. -->
 		{#each [MIDDLE, ...linked] as i (i)}
 			{@const { x, y } = cell(i)}
-			<rect class="outline" class:middle={i === MIDDLE} class:subject={i === subject} x={x} y={y} width={CELL} height={CELL} />
+			{@const w = i === subject && i !== MIDDLE ? 2 : 1}
+			<rect class="outline" class:middle={i === MIDDLE} class:subject={i === subject} x={x + w / 2} y={y + w / 2} width={CELL - w} height={CELL - w}
+				stroke-width={w} pathLength="100" />
 		{/each}
 	</svg>
 	<figcaption>
@@ -279,7 +276,7 @@
 				{offset(subject)}: {format(kernel[subject]!)}
 			{/if}
 		</div>
-		<div class="line">Middle: 1 − the rest.</div>
+		<div class="line">Dashed: 1 − the rest.</div>
 	</figcaption>
 </figure>
 
@@ -295,7 +292,7 @@
 		touch-action: none;
 		cursor: ns-resize;
 	}
-	.middle {
+	.tap.middle {
 		cursor: default;
 	}
 	.cell {
@@ -303,19 +300,19 @@
 		stroke: var(--rule);
 		stroke-width: 1;
 	}
-	/* Drawn after every cell, so no neighbor's edge covers them. */
+	/* Drawn after every cell, so no cell's edge covers them. */
 	.outline {
 		fill: none;
 		stroke: var(--text);
 		pointer-events: none;
 	}
-	/* Dashed, as it's worked out rather than set. */
+	/* Dashed, as it's worked out rather than set; darker while the caption is about it. */
 	.outline.middle {
 		stroke: var(--text-muted);
 		stroke-dasharray: 3 2;
 	}
-	.outline.subject {
-		stroke-width: 2;
+	.outline.middle.subject {
+		stroke: var(--text);
 	}
 	.weight {
 		fill: var(--text);
