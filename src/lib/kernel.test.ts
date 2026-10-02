@@ -1,7 +1,7 @@
 // Model-output: Claude Opus 5.5
 import { array, assert, constantFrom, double, integer, property } from "fast-check";
 import { describe, expect, test } from "vitest";
-import { BALANCES, FLAT, GROUPS, Kernels, MAX_SEED, PRESETS, TAPS, TRANSFORMS, gen_kernel, group_of, mutated, next_seed, seeded_kernel, with_contrast, with_delta, with_drift } from "./kernel";
+import { FLAT, GROUPS, Kernels, MAX_SEED, MIDDLE, PRESETS, TAPS, TRANSFORMS, gen_kernel, group_of, mutated, next_seed, reweighted, seeded_kernel, with_contrast, with_drift } from "./kernel";
 
 /** Uniform draws in [0, 1), as many as a kernel takes: two per tap and one for the smoothing. */
 const draws = array(double({ min: 0, max: 1, maxExcluded: true, noNaN: true }), { minLength: 2 * TAPS + 1, maxLength: 2 * TAPS + 1 });
@@ -99,27 +99,43 @@ describe("group_of", () => {
 		expect(group_of(13, "pair").toSorted((a, b) => a - b)).toEqual([11, 13]);
 		expect(group_of(13, "ring")).toHaveLength(4); // (1, 0)
 		expect(group_of(19, "ring")).toHaveLength(8); // (2, 1)
-		expect(group_of(12, "ring")).toEqual([12]);
+	});
+
+	test("refuses the middle tap, which follows the others", () => {
+		expect(() => group_of(MIDDLE, "tap")).toThrow("12 === 12");
 	});
 });
 
-describe("with_delta", () => {
-	test("moves the group's weights and keeps the sum", () => {
-		assert(property(draws, integer({ min: 0, max: TAPS - 1 }), double({ min: -1, max: 1, noNaN: true }), constantFrom(...GROUPS), constantFrom(...BALANCES),
-			(values, index, delta, group, balance) => {
+describe("reweighted", () => {
+	test("moves the group's weights, and only the middle tap makes up for them", () => {
+		const others = integer({ min: 0, max: TAPS - 2 }).map((i) => (i < MIDDLE ? i : i + 1));
+		assert(property(draws, others, double({ min: -1, max: 1, noNaN: true }), constantFrom(...GROUPS),
+			(values, index, delta, group) => {
 				const kernel = gen_kernel(replay(values));
 				const taps = group_of(index, group);
-				const edited = with_delta(kernel, taps, delta, balance);
-				for (const i of taps) {
-					expect(edited[i]! - kernel[i]!).toBeCloseTo(delta, 12);
-				}
+				const edited = reweighted(kernel, taps, (k) => k + delta);
+				const moved  = kernel.map((k, i) => (taps.includes(i) ? k + delta : k));
+				expect(edited.toSpliced(MIDDLE, 1)).toEqual(moved.toSpliced(MIDDLE, 1));
 				expect(sum(edited)).toBeCloseTo(1, 10);
 			}));
 	});
 
-	test("keeps a sparse kernel sparse when the middle makes up", () => {
-		const edited = with_delta(PRESETS.shift, [13], -0.5, "middle");
+	test("keeps a sparse kernel sparse", () => {
+		const edited = reweighted(PRESETS.shift, [13], (k) => k - 0.5);
 		expect(edited.filter((k) => k !== 0)).toEqual([0.5, 0.5]);
+	});
+
+	test("sets a whole ring, whatever its weights were", () => {
+		const ring = group_of(13, "ring");
+		const edited = reweighted(seeded_kernel(7), ring, () => 0);
+		for (const i of ring) {
+			expect(edited[i]).toBe(0);
+		}
+		expect(sum(edited)).toBeCloseTo(1, 12);
+	});
+
+	test("refuses to set the middle tap", () => {
+		expect(() => reweighted(PRESETS.box, [MIDDLE], () => 0)).toThrow("0 !== -1");
 	});
 });
 
@@ -162,7 +178,7 @@ describe("Kernels", () => {
 		kernels.advance(2);
 		kernels.advance(2);
 		expect(kernels.kernel).toEqual(PRESETS.ring);
-		const edited = with_delta(PRESETS.ring, [0], 0.5, "others");
+		const edited = reweighted(PRESETS.ring, [0], (k) => k + 0.5);
 		kernels.edit(edited);
 		kernels.advance(1);
 		expect(kernels.kernel).toEqual(edited);

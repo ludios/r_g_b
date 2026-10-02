@@ -2,17 +2,21 @@
 <script lang="ts">
 	// The kernel as a Hinton diagram: each tap's weight as a square, laid out as the taps are on
 	// screen, whose area is the weight's size, filled if positive and hollow if negative. Dragging
-	// a square up or down changes its weight; the taps that move with it are outlined.
-	import { type Group, type Kernel, TAPS, group_of, tap_offset } from "./kernel";
+	// a square up or down changes its weight; the taps that change with it are outlined. The middle
+	// tap is whatever makes the sum 1, so it follows the others rather than being dragged itself.
+	import { type Group, type Kernel, MIDDLE, TAPS, group_of, reweighted, tap_offset } from "./kernel";
 
 	interface Props {
 		kernel: Kernel;
-		/** Which taps a drag moves together. */
+		/** Which taps an edit changes together. */
 		group: Group;
-		/** Called as a drag begins. */
+		/** Called before a drag, which undo takes back in one go. */
 		onstart: () => void;
-		/** Called with a tap's index and its new weight as it's dragged. */
-		onedit: (index: number, weight: number) => void;
+		/**
+		 * Called with each edited kernel.
+		 * @param dragging Whether it's one move of a drag, with more to come.
+		 */
+		onedit: (kernel: Kernel, dragging: boolean) => void;
 	}
 
 	let { kernel, group, onstart, onedit }: Props = $props();
@@ -20,11 +24,23 @@
 	const CELL = 26;
 	/** How much a weight changes per pixel of drag. */
 	const PER_PX = 0.005;
+	/** How many pixels a press moves up or down before it's a drag rather than a click. */
+	const SLOP = 3;
 
-	/** The tap being dragged or pointed at, if any, and those that move with it. */
-	let active  = $state<number | null>(null);
-	const linked = $derived(active === null ? [] : group_of(active, group));
-	let drag: { index: number; y: number; weight: number } | null = null;
+	/** The tap pointed at, if any. */
+	let hover    = $state<number | null>(null);
+	/** The tap being dragged, if any. */
+	let dragged  = $state<number | null>(null);
+	/**
+	 * The tap pressed while the pointer's down, and where; once it's moved far enough to be a drag,
+	 * where that started and the kernel then.
+	 */
+	let press: { index: number; y: number; from: Kernel | null } | null = null;
+
+	/** The tap the caption describes. */
+	const subject = $derived(dragged ?? hover);
+	/** The taps that change with the subject. */
+	const linked  = $derived(subject === null || subject === MIDDLE ? [] : group_of(subject, group));
 
 	/** The top left of tap `i`'s cell: row 0 of a kernel is the bottom row. */
 	function cell(i: number): { x: number; y: number } {
@@ -36,51 +52,65 @@
 		return CELL * 0.9 * Math.sqrt(Math.min(1, Math.abs(weight)));
 	}
 
-	function start(event: PointerEvent, index: number): void {
-		event.preventDefault();
-		(event.currentTarget as Element).closest("svg")!.setPointerCapture(event.pointerId);
-		drag = { index, y: event.clientY, weight: kernel[index]! };
-		active = index;
-		onstart();
-	}
-
-	function move(event: PointerEvent): void {
-		if (drag !== null) {
-			onedit(drag.index, drag.weight + (drag.y - event.clientY) * PER_PX);
-		}
-	}
-
-	function end(): void {
-		drag = null;
-	}
-
 	/** Where tap `i` reads from, in taps from the pixel itself; up is +y. */
 	function offset(i: number): string {
 		return `(${tap_offset(i).x}, ${tap_offset(i).y})`;
+	}
+
+	function down(event: PointerEvent, index: number): void {
+		event.preventDefault();
+		(event.currentTarget as Element).closest("svg")!.setPointerCapture(event.pointerId);
+		press = { index, y: event.clientY, from: null };
+	}
+
+	/** Once a press has moved far enough up or down, drags the tap's weight, and its group's, with it. */
+	function move(event: PointerEvent): void {
+		if (press === null || press.index === MIDDLE) {
+			return;
+		}
+		if (press.from === null) {
+			if (Math.abs(event.clientY - press.y) < SLOP) {
+				return;
+			}
+			press.y    = event.clientY;
+			press.from = kernel;
+			dragged    = press.index;
+			onstart();
+		}
+		const delta = (press.y - event.clientY) * PER_PX;
+		onedit(reweighted(press.from, group_of(press.index, group), (k) => k + delta), true);
+	}
+
+	function end(): void {
+		press   = null;
+		dragged = null;
 	}
 </script>
 
 <figure>
 	<div class="figure-title">Hinton diagram</div>
 	<svg viewBox="-1 -1 {5 * CELL + 2} {5 * CELL + 2}" width={5 * CELL + 2} height={5 * CELL + 2} role="img" aria-label="The kernel's 25 weights"
-		onpointermove={move} onpointerup={end} onpointercancel={end} onpointerleave={() => drag === null && (active = null)}>
+		onpointermove={move} onpointerup={end} onpointercancel={end} onpointerleave={() => (hover = null)}>
 		{#each { length: TAPS } as _, i (i)}
 			{@const { x, y } = cell(i)}
 			{@const w = kernel[i]!}
 			{@const s = side(w)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<g class="tap" class:middle={i === 12} class:linked={linked.includes(i)} onpointerdown={(e) => start(e, i)} onpointerenter={() => drag === null && (active = i)}>
+			<g class="tap" class:middle={i === MIDDLE} class:linked={linked.includes(i)} onpointerdown={(e) => down(e, i)} onpointerenter={() => (hover = i)}>
 				<rect class="cell" x={x} y={y} width={CELL} height={CELL} />
 				<rect class="weight" class:negative={w < 0} x={x + (CELL - s) / 2} y={y + (CELL - s) / 2} width={s} height={s} />
 			</g>
 		{/each}
 	</svg>
 	<figcaption>
-		{#if active === null}
-			Drag to edit.
-		{:else}
-			{offset(active)}: {kernel[active]!.toFixed(3)}
-		{/if}
+		<div class="line">
+			{#if subject === null}
+				Drag to edit.
+			{:else}
+				{offset(subject)}: {kernel[subject]!.toFixed(3)}
+			{/if}
+		</div>
+		<div class="line"><span class="accent">Middle</span>: 1 − the rest.</div>
 	</figcaption>
 </figure>
 
@@ -95,6 +125,9 @@
 		display: block;
 		touch-action: none;
 		cursor: ns-resize;
+	}
+	.middle {
+		cursor: default;
 	}
 	.cell {
 		fill: transparent;
@@ -119,7 +152,12 @@
 		font-size: 11px;
 		color: var(--text-muted);
 		font-variant-numeric: tabular-nums;
+	}
+	.line {
 		white-space: nowrap;
 		overflow: hidden;
+	}
+	.accent {
+		color: var(--accent);
 	}
 </style>

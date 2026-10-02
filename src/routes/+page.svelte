@@ -8,7 +8,7 @@
 	import KernelDiagram from "$lib/KernelDiagram.svelte";
 	import TapsOverlay from "$lib/TapsOverlay.svelte";
 	import { type KernelName, decode, encode } from "$lib/codec";
-	import { BALANCES, type Balance, GROUPS, type Group, type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, TRANSFORMS, type Transform, group_of, mutated, next_seed, with_contrast, with_delta, with_drift } from "$lib/kernel";
+	import { GROUPS, type Group, type Kernel, Kernels, MAX_SEED, PRESETS, type Preset, type Source, TRANSFORMS, type Transform, mutated, next_seed, with_contrast, with_drift } from "$lib/kernel";
 	import { CLICKS, type Click, DEFAULT_SETTINGS, MOUSE_TARGETS, type MouseTarget, BIT_DEPTHS, PIXEL_SIZES, SEEDS, SETTINGS_PRESETS, SLIDERS, type Seeds, type Settings, type SettingsPreset, type Slider, VIEWS, type View, position_of, value_at } from "$lib/settings";
 	import { Simulation } from "$lib/simulation";
 	import { growing } from "$lib/spectrum";
@@ -249,14 +249,8 @@
 		sync();
 	}
 
-	/** Which taps a drag moves together, and which make up for it so the sum stays 1. */
-	let group   = $state<Group>("tap");
-	let balance = $state<Balance>("middle");
-
-	/** Sets a dragged weight of the kernel shown, moving its group's weights as much. */
-	function edit_weight(index: number, weight: number): void {
-		take(with_delta(shown, group_of(index, group), weight - shown[index]!, balance), true);
-	}
+	/** Which taps an edit on the Hinton diagram changes together. */
+	let group = $state<Group>("tap");
 
 	function transform(name: Transform): void {
 		remember();
@@ -489,13 +483,11 @@
 		["Stripes grow and move", ["checker", "advect"]],
 	];
 	A.eq(PRESET_GROUPS.flatMap(([, names]) => names).toSorted().join(), PRESET_NAMES.toSorted().join());
-	const GROUP_LABELS:   Record<Group, string>   = { tap: "one tap", pair: "a tap and the one opposite", ring: "a tap's whole ring" };
-	const BALANCE_LABELS: Record<Balance, string> = { middle: "the middle tap", others: "all the other taps" };
+	const GROUP_LABELS: Record<Group, string> = { tap: "one tap", pair: "a tap and the one opposite", ring: "a tap's whole ring" };
 	const SEED_LABELS:  Record<Seeds, string> = { rgb: "R G B dots", white: "White dot", pixel: "One pixel", none: "None" };
 	const VIEW_LABELS:  Record<View, string>  = { color: "Color", red: "Red", green: "Green", blue: "Blue", change: "Change", clipped: "Clipped" };
-	/** The View section's lines: the picture and its channels, then what the last step did. */
-	const VIEW_LINES: View[][] = [["color", "red", "green", "blue"], ["change", "clipped"]];
-	A.eq(VIEW_LINES.flat().join(), VIEWS.join());
+	/** The View section's lines: the picture and its channels, then what the last step did, from Change on. */
+	const VIEW_LINES = [VIEWS.slice(0, VIEWS.indexOf("change")), VIEWS.slice(VIEWS.indexOf("change"))];
 	const THEME_LABELS: Record<Theme, string> = { system: "Browser's theme", light: "Light", dark: "Dark" };
 	const SETTINGS_PRESET_LABELS: Record<SettingsPreset, string> = { still: "No mouse", noise: "From noise", gray: "Black and white", paint: "Paint" };
 </script>
@@ -567,7 +559,7 @@
 						{/if}
 					{/if}
 					<div class="figures">
-						<KernelDiagram kernel={shown} group={group} onstart={remember} onedit={edit_weight} />
+						<KernelDiagram kernel={shown} group={group} onstart={remember} onedit={take} />
 						<GrowthMap model={model} theme={theme.theme} onplant={(fx, fy) => restart({ fx, fy })} ongrow={grow} bind:caption={map_caption} />
 					</div>
 					<p class="muted map-caption">{map_caption}</p>
@@ -582,18 +574,10 @@
 						<button type="button" onclick={mutate}>Mutate</button>
 					</div>
 					<label class="row">
-						<span>Drag moves</span>
+						<span>Edits change</span>
 						<select class="wide" bind:value={group}>
 							{#each GROUPS as g (g)}
 								<option value={g}>{GROUP_LABELS[g]}</option>
-							{/each}
-						</select>
-					</label>
-					<label class="row">
-						<span>Made up by</span>
-						<select class="wide" bind:value={balance}>
-							{#each BALANCES as b (b)}
-								<option value={b}>{BALANCE_LABELS[b]}</option>
 							{/each}
 						</select>
 					</label>
@@ -684,15 +668,13 @@
 
 				<details class="section" bind:open={open.view}>
 					<summary>View</summary>
-					<div class="lines">
-						{#each VIEW_LINES as line (line)}
-							<div class="choices">
-								{#each line as view (view)}
-									<label><input type="radio" name="view" bind:group={settings.view} value={view} /> {VIEW_LABELS[view]}</label>
-								{/each}
-							</div>
-						{/each}
-					</div>
+					{#each VIEW_LINES as line (line[0])}
+						<div class="choices">
+							{#each line as view (view)}
+								<label><input type="radio" name="view" bind:group={settings.view} value={view} /> {VIEW_LABELS[view]}</label>
+							{/each}
+						</div>
+					{/each}
 				</details>
 
 				<details class="section" bind:open={open.pointer}>
@@ -745,7 +727,7 @@
 			<details class="section" bind:open={open.how}>
 				<summary>How it works (slop)</summary>
 				<div class="prose">
-					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the Hinton Diagram's squares are their weights, hollow if negative. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat.</p>
+					<p>Each step, every pixel becomes a weighted sum of 25 samples, the kernel's taps; the Hinton Diagram's squares are their weights, hollow if negative. Persistence blends the sum with the old value, or below 0 pushes past it. Each channel is then clipped to 0–1, and the seeds are stamped if stamping is on. The weights sum to 1, so flat color stays flat; to keep it so, when a square is dragged, the middle one takes up the difference.</p>
 					<p>“Tap” is a signal-processing term for one place a filter reads a sample and multiplies it by a weight. It comes from FIR filters built as a tapped delay line: a signal runs down a chain of delays, and each tap pulls off a copy and scales it. Here each tap is an offset from the pixel (x and y from −2 to 2, times Spacing) and a weight (its square in the diagram).</p>
 					<p>The Frequency Response map estimates what a step multiplies stripes' contrast by, for every stripe width and direction (flat in the middle, finer outward), before clipping: shaded where that's over 1, so they grow, and circled where fastest. A step can also shift stripes; half a cycle swaps bright and dark, and near that (hatched) they strobe.</p>
 					<p>Contrast scales each weight's distance from 1/25. Drift scales the kernel's lopsided part, which shifts stripes and can grow them.</p>
@@ -926,10 +908,9 @@
 		gap: 4px 12px;
 		font-size: 12px;
 	}
-	/* Lines of choices that each start on a new line, as far apart as a wrapped line. */
-	.lines {
-		display: grid;
-		gap: 4px;
+	/* Stacked lines of choices are as far apart as a wrapped line. */
+	.choices + .choices {
+		margin-top: 4px;
 	}
 	input[type="checkbox"], input[type="radio"] {
 		margin: 0;

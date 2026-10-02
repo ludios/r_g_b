@@ -205,41 +205,37 @@ export const TRANSFORMS = {
 
 export type Transform = keyof typeof TRANSFORMS;
 
-/** Which taps a drag moves together: one, it and its mirror image through the middle, or its ring. */
+/** The middle tap: edits set the others, and it's whatever makes the sum 1. */
+export const MIDDLE = index_of(0, 0);
+
+/** Which taps an edit changes together: one, it and its mirror image through the middle, or its ring. */
 export const GROUPS = ["tap", "pair", "ring"] as const;
 export type Group = (typeof GROUPS)[number];
-
-/** Which taps make up for an edit, keeping the sum: the others evenly, or the middle tap. */
-export const BALANCES = ["others", "middle"] as const;
-export type Balance = (typeof BALANCES)[number];
 
 /** The taps in tap `index`'s group, it included. */
 export function group_of(index: number, group: Group): number[] {
 	A.gte(index, 0);
 	A.lt(index, TAPS);
-	const { x, y } = tap_offset(index);
-	if (group === "tap" || (x === 0 && y === 0)) {
+	A.neq(index, MIDDLE);
+	if (group === "tap") {
 		return [index];
 	}
 	if (group === "pair") {
 		return [index, TAPS - 1 - index];
 	}
+	const { x, y } = tap_offset(index);
 	return Array.from({ length: TAPS }, (_, i) => i).filter((i) => tap_offset(i).x ** 2 + tap_offset(i).y ** 2 === x * x + y * y);
 }
 
 /**
- * The kernel with `delta` added to each tap of `taps`, and taken back from the others evenly or
- * from the middle tap, so the sum stays; the others make up when the middle is among `taps`.
+ * The kernel with each of `taps` given the weight `reweight` makes of its old one, and the middle
+ * tap, which can't be among them, set to what's left of 1.
  */
-export function with_delta(kernel: Kernel, taps: number[], delta: number, balance: Balance): Kernel {
-	A.gt(taps.length, 0);
-	const middle = index_of(0, 0);
-	const total  = delta * taps.length;
-	if (balance === "middle" && !taps.includes(middle)) {
-		return kernel.map((k, i) => (taps.includes(i) ? k + delta : i === middle ? k - total : k));
-	}
-	const spread = total / (TAPS - taps.length);
-	return kernel.map((k, i) => (taps.includes(i) ? k + delta : k - spread));
+export function reweighted(kernel: Kernel, taps: number[], reweight: (weight: number) => number): Kernel {
+	A.eq(taps.indexOf(MIDDLE), -1);
+	const out = kernel.map((k, i) => (taps.includes(i) ? reweight(k) : k));
+	out[MIDDLE] = 1 - out.reduce((sum, k, i) => (i === MIDDLE ? sum : sum + k), 0);
+	return out;
 }
 
 /**
