@@ -488,12 +488,12 @@
 	const CLICK_LABELS:  Record<Click, string>  = { kernel: "New kernel", paint: "Paint", erase: "Erase", taps: "Show taps" };
 	const PRESET_LABELS: Record<Preset, string> = {
 		identity: "Identity", box: "Box blur", shift: "Shift", lean: "Lean", skip: "Every other tap",
-		row: "One row", saddle: "Saddle", ring: "Center-surround", circles: "Circles", dots: "Dots", sharpen: "Sharpen",
+		row: "One row", saddle: "Saddle", ring: "Center-surround", circles: "Circles", dots: "Dots", hexagons: "Hexagons", sharpen: "Sharpen",
 		checker: "Checkerboard", advect: "Advect",
 	};
 	const PRESET_GROUPS: [string, Preset[]][] = [
 		["Nothing grows", ["identity", "box", "shift", "lean", "skip"]],
-		["Stripes grow", ["row", "saddle", "ring", "circles", "dots", "sharpen"]],
+		["Stripes grow", ["row", "saddle", "ring", "circles", "dots", "hexagons", "sharpen"]],
 		["Stripes grow and move", ["checker", "advect"]],
 	];
 	A.eq(PRESET_GROUPS.flatMap(([, names]) => names).toSorted().join(), PRESET_NAMES.toSorted().join());

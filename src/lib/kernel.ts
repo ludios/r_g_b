@@ -66,6 +66,12 @@ export const PRESETS = {
 	circles:  kernel_of((x, y) => ({ 0: 0.96, 1: 0.37, 2: -0.08, 4: -0.13, 5: -0.07, 8: -0.01 })[x * x + y * y] ?? 0),
 	/** The row and its quarter turn, halved: two diagonal stripes cross, and the clamp makes dots. */
 	dots:     kernel_of((x, y) => (x !== 0 && y !== 0 ? 0 : x === 0 && y === 0 ? 0.5 : Math.abs(x + y) === 1 ? 0.25 : -0.125)),
+	/**
+	 * Strong middle, negative taps on as near a hexagon as the grid has: stripes about 3 taps apart
+	 * grow in three directions about 60 degrees apart, so a dot grows into hexagons, then a lattice
+	 * of spots. As under skip, pixels split into lattices that mix only by jitter.
+	 */
+	hexagons: kernel_of((x, y) => (x === 0 && y === 0 ? 1.3 : (Math.abs(x) === 2 && y === 0) || (Math.abs(x) === 1 && Math.abs(y) === 2) ? -0.05 : 0)),
 	/** Strong middle, negative neighbors: the finest checkerboard doubles every step. */
 	sharpen:  kernel_of((x, y) => (x === 0 && y === 0 ? 1.5 : Math.abs(x) + Math.abs(y) === 1 ? -0.125 : 0)),
 	/** Negative middle, positive neighbors: the checkerboard doubles and inverts every step. */

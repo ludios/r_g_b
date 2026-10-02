@@ -161,4 +161,16 @@ describe("presets", () => {
 			expect(Math.abs(fastest_along(PRESETS.circles, degrees) / level - 1)).toBeLessThan(0.01);
 		}
 	});
+
+	test("the hexagons grow stripes fastest in three directions about 60 degrees apart", () => {
+		const model = { kernel: PRESETS.hexagons, spacing: 1, jitter: 0, persistence: 0 };
+		// Across, and 56 degrees either side of up, all six taps land a third of a cycle along the
+		// wave either way, at -1/2: as low as they can all be at once.
+		for (const [fx, fy] of [[1 / 3, 0], [1 / 6, 1 / 4], [-1 / 6, 1 / 4]] as const) {
+			expect(multiplier(model, fx, fy).growth).toBeCloseTo(1.45, 12);
+		}
+		for (const degrees of [28, 90, 152]) {
+			expect(fastest_along(PRESETS.hexagons, degrees)).toBeLessThan(1.41);
+		}
+	});
 });
