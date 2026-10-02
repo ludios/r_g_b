@@ -399,8 +399,9 @@
 		const distance = Math.hypot(dx, dy);
 		opacity = 1 - Math.min(1, Math.max(0, (distance - NEAR) / (FAR - NEAR)));
 		if (distance > 0) {
-			follow(settings.mouse_x, event.clientX / window.innerWidth, "x");
-			follow(settings.mouse_y, event.clientY / window.innerHeight, "y");
+			// A drag can carry the pointer past the window's edges; there it counts as at the nearest one.
+			follow(settings.mouse_x, Math.min(1, Math.max(0, event.clientX / window.innerWidth)), "x");
+			follow(settings.mouse_y, Math.min(1, Math.max(0, event.clientY / window.innerHeight)), "y");
 		}
 	}
 
